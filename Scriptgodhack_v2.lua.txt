@@ -1,0 +1,1271 @@
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+
+-- 檢查是否成功獲取本地玩家
+if not Player then
+    warn("無法找到玩家。請確保您在客戶端運行腳本。")
+    return
+end
+
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- 顯示通知（加載時自動顯示）
+game.StarterGui:SetCore("SendNotification", {
+    Title = "eoHub",
+    Text = "成功運行，測試階段請別亂用",
+    Duration = 999
+})
+
+-- 創建主屏幕GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SimpleGUI"
+ScreenGui.Parent = PlayerGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- ========== 密碼保護系統開始 ==========
+local password = "eogame1223"  -- 設置密碼 <--- 這裡是密碼設置位置
+
+-- 創建密碼驗證GUI
+local PasswordScreenGui = Instance.new("ScreenGui")
+PasswordScreenGui.Name = "PasswordScreenGui"
+PasswordScreenGui.Parent = PlayerGui
+PasswordScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+PasswordScreenGui.ResetOnSpawn = false
+
+-- 創建黑色背景遮罩
+local BlackOverlay = Instance.new("Frame")
+BlackOverlay.Name = "BlackOverlay"
+BlackOverlay.Size = UDim2.new(1, 0, 1, 0)
+BlackOverlay.Position = UDim2.new(0, 0, 0, 0)
+BlackOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BlackOverlay.BackgroundTransparency = 0.1
+BlackOverlay.BorderSizePixel = 0
+BlackOverlay.Parent = PasswordScreenGui
+
+-- 創建白色長方形密碼按鈕
+local PasswordButton = Instance.new("TextButton")
+PasswordButton.Name = "PasswordButton"
+PasswordButton.Size = UDim2.new(0, 300, 0, 50)
+PasswordButton.Position = UDim2.new(0.5, -150, 0.5, -25)
+PasswordButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+PasswordButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+PasswordButton.Text = "點擊輸入密碼"
+PasswordButton.Font = Enum.Font.Gotham
+PasswordButton.TextScaled = true
+PasswordButton.Parent = BlackOverlay
+
+-- 創建密碼輸入框（初始隱藏）
+local PasswordInputFrame = Instance.new("Frame")
+PasswordInputFrame.Name = "PasswordInputFrame"
+PasswordInputFrame.Size = UDim2.new(0, 350, 0, 200)
+PasswordInputFrame.Position = UDim2.new(0.5, -175, 0.5, -100)
+PasswordInputFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+PasswordInputFrame.BorderSizePixel = 0
+PasswordInputFrame.Visible = false
+PasswordInputFrame.Parent = BlackOverlay
+
+local PasswordInputCorner = Instance.new("UICorner")
+PasswordInputCorner.CornerRadius = UDim.new(0.05, 0)
+PasswordInputCorner.Parent = PasswordInputFrame
+
+-- 密碼輸入標題
+local PasswordTitle = Instance.new("TextLabel")
+PasswordTitle.Name = "PasswordTitle"
+PasswordTitle.Size = UDim2.new(0, 310, 0, 40)
+PasswordTitle.Position = UDim2.new(0, 20, 0, 20)
+PasswordTitle.BackgroundTransparency = 1
+PasswordTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+PasswordTitle.Text = "請輸入密碼以使用 eoHub"
+PasswordTitle.Font = Enum.Font.GothamBold
+PasswordTitle.TextScaled = true
+PasswordTitle.Parent = PasswordInputFrame
+
+-- 密碼輸入框
+local PasswordTextBox = Instance.new("TextBox")
+PasswordTextBox.Name = "PasswordTextBox"
+PasswordTextBox.Size = UDim2.new(0, 310, 0, 40)
+PasswordTextBox.Position = UDim2.new(0, 20, 0, 70)
+PasswordTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+PasswordTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+PasswordTextBox.Font = Enum.Font.Gotham
+PasswordTextBox.TextScaled = true
+PasswordTextBox.PlaceholderText = "輸入密碼..."
+PasswordTextBox.Text = ""
+PasswordTextBox.Parent = PasswordInputFrame
+
+local PasswordTextBoxCorner = Instance.new("UICorner")
+PasswordTextBoxCorner.CornerRadius = UDim.new(0.05, 0)
+PasswordTextBoxCorner.Parent = PasswordTextBox
+
+-- 確認按鈕
+local ConfirmButton = Instance.new("TextButton")
+ConfirmButton.Name = "ConfirmButton"
+ConfirmButton.Size = UDim2.new(0, 150, 0, 40)
+ConfirmButton.Position = UDim2.new(0, 20, 0, 130)
+ConfirmButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+ConfirmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ConfirmButton.Text = "確認"
+ConfirmButton.Font = Enum.Font.Gotham
+ConfirmButton.TextScaled = true
+ConfirmButton.Parent = PasswordInputFrame
+
+local ConfirmButtonCorner = Instance.new("UICorner")
+ConfirmButtonCorner.CornerRadius = UDim.new(0.05, 0)
+ConfirmButtonCorner.Parent = ConfirmButton
+
+-- 錯誤信息顯示
+local ErrorLabel = Instance.new("TextLabel")
+ErrorLabel.Name = "ErrorLabel"
+ErrorLabel.Size = UDim2.new(0, 310, 0, 30)
+ErrorLabel.Position = UDim2.new(0, 20, 0, 110)
+ErrorLabel.BackgroundTransparency = 1
+ErrorLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+ErrorLabel.Text = ""
+ErrorLabel.Font = Enum.Font.Gotham
+ErrorLabel.TextScaled = true
+ErrorLabel.Visible = false
+ErrorLabel.Parent = PasswordInputFrame
+
+-- 密碼驗證功能
+local function verifyPassword()
+    local inputPassword = PasswordTextBox.Text
+    
+    if inputPassword == password then
+        -- 密碼正確，隱藏密碼保護界面，顯示主GUI圖標
+        PasswordScreenGui:Destroy()
+        ScreenGui.Enabled = true
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "eoHub",
+            Text = "密碼正確！功能已解鎖",
+            Duration = 3
+        })
+    else
+        -- 密碼錯誤
+        ErrorLabel.Text = "密碼錯誤！請重新輸入"
+        ErrorLabel.Visible = true
+        PasswordTextBox.Text = ""
+        
+        -- 錯誤提示後3秒隱藏錯誤信息
+        task.wait(3)
+        ErrorLabel.Visible = false
+    end
+end
+
+-- 白色按鈕點擊事件：顯示密碼輸入框
+PasswordButton.MouseButton1Click:Connect(function()
+    PasswordInputFrame.Visible = true
+    PasswordButton.Visible = false
+end)
+
+-- 確認按鈕點擊事件
+ConfirmButton.MouseButton1Click:Connect(function()
+    verifyPassword()
+end)
+
+-- 回車鍵提交密碼
+PasswordTextBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        verifyPassword()
+    end
+end)
+
+-- 初始隱藏主GUI，直到密碼驗證通過
+ScreenGui.Enabled = false
+-- ========== 密碼保護系統結束 ==========
+
+-- 創建圖標按鈕
+local IconButton = Instance.new("ImageButton")
+IconButton.Name = "IconButton"
+IconButton.Size = UDim2.new(0, 60, 0, 60)
+IconButton.Position = UDim2.new(0, 20, 0, 20)
+IconButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+IconButton.BackgroundTransparency = 0.5
+IconButton.Image = "rbxassetid://138136991120099"
+IconButton.ScaleType = Enum.ScaleType.Fit
+IconButton.Parent = ScreenGui
+
+-- 創建圓角效果
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0.2, 0)
+UICorner.Parent = IconButton
+
+-- 創建主面板 (高度改為400，是原本200的2倍)
+local MainPanel = Instance.new("Frame")
+MainPanel.Name = "MainPanel"
+MainPanel.Size = UDim2.new(0, 300, 0, 450)  -- 高度改為400
+MainPanel.Position = UDim2.new(0, 90, 0, 20)
+MainPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+MainPanel.BackgroundTransparency = 0.1
+MainPanel.Visible = false
+MainPanel.Parent = ScreenGui
+
+local MainPanelCorner = Instance.new("UICorner")
+MainPanelCorner.CornerRadius = UDim.new(0.05, 0)
+MainPanelCorner.Parent = MainPanel
+
+-- 創建信息頁面面板
+local InfoPanel = Instance.new("Frame")
+InfoPanel.Name = "InfoPanel"
+InfoPanel.Size = UDim2.new(0, 300, 0, 200)
+InfoPanel.Position = UDim2.new(0, 90, 0, 20)
+InfoPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+InfoPanel.BackgroundTransparency = 0.1
+InfoPanel.Visible = false
+InfoPanel.Parent = ScreenGui
+
+local InfoPanelCorner = Instance.new("UICorner")
+InfoPanelCorner.CornerRadius = UDim.new(0.05, 0)
+InfoPanelCorner.Parent = InfoPanel
+
+-- ========== 自動戰鬥系統設置開始 ==========
+local FastAttackSettings = {
+    AutoClick = false,
+    ClickDelay = 0,
+    Team = "Marines",
+    Distance = 150
+}
+-- ========== 自動戰鬥系統設置結束 ==========
+
+-- 在主面板添加飛到Tiki的按钮 (新增按鈕，放在原按鈕下方)
+local flyToTikiButton = Instance.new("TextButton")
+flyToTikiButton.Name = "FlyToTikiButton"
+flyToTikiButton.Size = UDim2.new(0, 150, 0, 40)
+flyToTikiButton.Position = UDim2.new(0, 20, 0, 170)
+flyToTikiButton.BackgroundColor3 = Color3.fromRGB(180, 100, 220)  -- 紫色系
+flyToTikiButton.Text = "飛到Tiki"
+flyToTikiButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyToTikiButton.TextScaled = true
+flyToTikiButton.Parent = MainPanel
+
+-- 在主面板添加传送按钮
+local teleportButton = Instance.new("TextButton")
+teleportButton.Name = "TeleportButton"
+teleportButton.Size = UDim2.new(0, 150, 0, 40)
+teleportButton.Position = UDim2.new(0, 20, 0, 20)
+teleportButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+teleportButton.Text = "自動海上飛行(標準位置在司法後面啟飛)"
+teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+teleportButton.TextScaled = true
+teleportButton.Parent = MainPanel
+
+-- 在主面板添加停止按钮
+local stopButton = Instance.new("TextButton")
+stopButton.Name = "StopButton"
+stopButton.Size = UDim2.new(0, 150, 0, 40)
+stopButton.Position = UDim2.new(0, 20, 0, 70)
+stopButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+stopButton.Text = "停止移動"
+stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+stopButton.TextScaled = true
+stopButton.Parent = MainPanel
+
+-- 在主面板添加信息页面按钮
+local infoButton = Instance.new("TextButton")
+infoButton.Name = "InfoButton"
+infoButton.Size = UDim2.new(0, 150, 0, 40)
+infoButton.Position = UDim2.new(0, 20, 0, 120)
+infoButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+infoButton.Text = "顯示信息"
+infoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoButton.TextScaled = true
+infoButton.Parent = MainPanel
+
+-- 在主面板添加自動戰鬥按钮 (放在飛到Tiki按鈕下方)
+local autoBattleButton = Instance.new("TextButton")
+autoBattleButton.Name = "AutoBattleButton"
+autoBattleButton.Size = UDim2.new(0, 150, 0, 40)
+autoBattleButton.Position = UDim2.new(0, 20, 0, 220)
+autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)  -- 橙色系
+autoBattleButton.Text = "自動戰鬥設置"
+autoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoBattleButton.TextScaled = true
+autoBattleButton.Parent = MainPanel
+
+local autoBattleCorner = Instance.new("UICorner")
+autoBattleCorner.CornerRadius = UDim.new(0, 8)
+autoBattleCorner.Parent = autoBattleButton
+
+-- 在主面板添加速度设置按钮 (放在自动战斗按钮右侧)
+local speedButton = Instance.new("TextButton")
+speedButton.Name = "SpeedButton"
+speedButton.Size = UDim2.new(0, 150, 0, 40)
+speedButton.Position = UDim2.new(0, 160, 0, 220)  -- X=160 (右侧)，Y=220 (与自动战斗按钮同一行)
+speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)  -- 蓝色系
+speedButton.Text = "速度设置"
+speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedButton.TextScaled = true
+speedButton.Parent = MainPanel
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 8)
+speedCorner.Parent = speedButton
+
+-- 在信息页面添加返回按钮
+local backButton = Instance.new("TextButton")
+backButton.Name = "BackButton"
+backButton.Size = UDim2.new(0, 150, 0, 40)
+backButton.Position = UDim2.new(0, 20, 0, 120)
+backButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+backButton.Text = "返回主頁"
+backButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+backButton.TextScaled = true
+backButton.Parent = InfoPanel
+
+-- 在信息页面添加信息文本
+local infoText = Instance.new("TextLabel")
+infoText.Name = "InfoText"
+infoText.Size = UDim2.new(0, 260, 0, 100)
+infoText.Position = UDim2.new(0, 20, 0, 20)
+infoText.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+infoText.BackgroundTransparency = 0.3
+infoText.Text = "eoHub 信息頁面\n\n版本: E1.5\n功能: 自動海上飛行、自動到司法\n作者: eoHub團隊"
+infoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoText.TextScaled = true
+infoText.Font = Enum.Font.Gotham
+infoText.Parent = InfoPanel
+
+-- 为所有按钮添加圆角
+local teleportCorner = Instance.new("UICorner")
+teleportCorner.CornerRadius = UDim.new(0, 8)
+teleportCorner.Parent = teleportButton
+
+local stopCorner = Instance.new("UICorner")
+stopCorner.CornerRadius = UDim.new(0, 8)
+stopCorner.Parent = stopButton
+
+local infoCorner = Instance.new("UICorner")
+infoCorner.CornerRadius = UDim.new(0, 8)
+infoCorner.Parent = infoButton
+
+local flyToTikiCorner = Instance.new("UICorner")
+flyToTikiCorner.CornerRadius = UDim.new(0, 8)
+flyToTikiCorner.Parent = flyToTikiButton
+
+local backCorner = Instance.new("UICorner")
+backCorner.CornerRadius = UDim.new(0, 8)
+backCorner.Parent = backButton
+
+local infoTextCorner = Instance.new("UICorner")
+infoTextCorner.CornerRadius = UDim.new(0, 8)
+infoTextCorner.Parent = infoText
+
+-- 創建自動戰鬥面板
+local BattlePanel = Instance.new("Frame")
+BattlePanel.Name = "BattlePanel"
+BattlePanel.Size = UDim2.new(0, 300, 0, 230)
+BattlePanel.Position = UDim2.new(0, 90, 0, 20)
+BattlePanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+BattlePanel.BackgroundTransparency = 0.1
+BattlePanel.Visible = false
+BattlePanel.Parent = ScreenGui
+
+local BattlePanelCorner = Instance.new("UICorner")
+BattlePanelCorner.CornerRadius = UDim.new(0.05, 0)
+BattlePanelCorner.Parent = BattlePanel
+
+-- 在自動戰鬥面板添加標題
+local battleTitle = Instance.new("TextLabel")
+battleTitle.Name = "BattleTitle"
+battleTitle.Size = UDim2.new(0, 260, 0, 40)
+battleTitle.Position = UDim2.new(0, 20, 0, 10)
+battleTitle.BackgroundTransparency = 1
+battleTitle.Text = "自動戰鬥設置"
+battleTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+battleTitle.TextScaled = true
+battleTitle.Font = Enum.Font.GothamBold
+battleTitle.Parent = BattlePanel
+
+-- 在自動戰鬥面板添加開關按鈕
+local toggleAutoBattleButton = Instance.new("TextButton")
+toggleAutoBattleButton.Name = "ToggleAutoBattleButton"
+toggleAutoBattleButton.Size = UDim2.new(0, 260, 0, 40)
+toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 60)
+toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+toggleAutoBattleButton.Text = "關閉自動戰鬥"
+toggleAutoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleAutoBattleButton.TextScaled = true
+toggleAutoBattleButton.Parent = BattlePanel
+
+local toggleAutoBattleCorner = Instance.new("UICorner")
+toggleAutoBattleCorner.CornerRadius = UDim.new(0, 8)
+toggleAutoBattleCorner.Parent = toggleAutoBattleButton
+
+-- 在自動戰鬥面板添加隊伍選擇按鈕
+local teamSelectButton = Instance.new("TextButton")
+teamSelectButton.Name = "TeamSelectButton"
+teamSelectButton.Size = UDim2.new(0, 260, 0, 40)
+teamSelectButton.Position = UDim2.new(0, 20, 0, 110)
+teamSelectButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+teamSelectButton.Text = "隊伍: 海軍"
+teamSelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+teamSelectButton.TextScaled = true
+teamSelectButton.Parent = BattlePanel
+
+local teamSelectCorner = Instance.new("UICorner")
+teamSelectCorner.CornerRadius = UDim.new(0, 8)
+teamSelectCorner.Parent = teamSelectButton
+
+-- 在自動戰鬥面板添加返回按鈕
+local battleBackButton = Instance.new("TextButton")
+battleBackButton.Name = "BattleBackButton"
+battleBackButton.Size = UDim2.new(0, 260, 0, 40)
+battleBackButton.Position = UDim2.new(0, 20, 0, 165)
+battleBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+battleBackButton.Text = "返回主頁"
+battleBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+battleBackButton.TextScaled = true
+battleBackButton.Parent = BattlePanel
+
+local battleBackCorner = Instance.new("UICorner")
+battleBackCorner.CornerRadius = UDim.new(0, 8)
+battleBackCorner.Parent = battleBackButton
+
+-- 创建速度设置面板
+local SpeedPanel = Instance.new("Frame")
+SpeedPanel.Name = "SpeedPanel"
+SpeedPanel.Size = UDim2.new(0, 300, 0, 310)
+SpeedPanel.Position = UDim2.new(0, 90, 0, 20)
+SpeedPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+SpeedPanel.BackgroundTransparency = 0.1
+SpeedPanel.Visible = false
+SpeedPanel.Parent = ScreenGui
+
+local SpeedPanelCorner = Instance.new("UICorner")
+SpeedPanelCorner.CornerRadius = UDim.new(0.05, 0)
+SpeedPanelCorner.Parent = SpeedPanel
+
+-- 標題
+local speedTitle = Instance.new("TextLabel")
+speedTitle.Name = "SpeedTitle"
+speedTitle.Size = UDim2.new(0, 260, 0, 35)
+speedTitle.Position = UDim2.new(0, 20, 0, 10)
+speedTitle.BackgroundTransparency = 1
+speedTitle.Text = "速度設置"
+speedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTitle.TextScaled = true
+speedTitle.Font = Enum.Font.GothamBold
+speedTitle.Parent = SpeedPanel
+
+-- 提示說明
+local speedHint = Instance.new("TextLabel")
+speedHint.Name = "SpeedHint"
+speedHint.Size = UDim2.new(0, 260, 0, 30)
+speedHint.Position = UDim2.new(0, 20, 0, 48)
+speedHint.BackgroundTransparency = 1
+speedHint.Text = "請先輸入速度，再點擊確認後才能開啟"
+speedHint.TextColor3 = Color3.fromRGB(180, 180, 180)
+speedHint.TextScaled = true
+speedHint.Font = Enum.Font.Gotham
+speedHint.Parent = SpeedPanel
+
+-- 速度輸入框
+local speedTextBox = Instance.new("TextBox")
+speedTextBox.Name = "SpeedTextBox"
+speedTextBox.Size = UDim2.new(0, 260, 0, 40)
+speedTextBox.Position = UDim2.new(0, 20, 0, 88)
+speedTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTextBox.Font = Enum.Font.Gotham
+speedTextBox.TextScaled = true
+speedTextBox.PlaceholderText = "輸入速度值 (預設: 16)"
+speedTextBox.Text = ""
+speedTextBox.Parent = SpeedPanel
+
+local speedTextBoxCorner = Instance.new("UICorner")
+speedTextBoxCorner.CornerRadius = UDim.new(0, 8)
+speedTextBoxCorner.Parent = speedTextBox
+
+-- 確認設定按鈕（輸入後點此確認，才能開啟）
+local confirmSpeedButton = Instance.new("TextButton")
+confirmSpeedButton.Name = "ConfirmSpeedButton"
+confirmSpeedButton.Size = UDim2.new(0, 260, 0, 40)
+confirmSpeedButton.Position = UDim2.new(0, 20, 0, 138)
+confirmSpeedButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
+confirmSpeedButton.Text = "確認設定速度"
+confirmSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+confirmSpeedButton.TextScaled = true
+confirmSpeedButton.Parent = SpeedPanel
+
+local confirmSpeedCorner = Instance.new("UICorner")
+confirmSpeedCorner.CornerRadius = UDim.new(0, 8)
+confirmSpeedCorner.Parent = confirmSpeedButton
+
+-- 目前設定顯示
+local speedStatusLabel = Instance.new("TextLabel")
+speedStatusLabel.Name = "SpeedStatusLabel"
+speedStatusLabel.Size = UDim2.new(0, 260, 0, 30)
+speedStatusLabel.Position = UDim2.new(0, 20, 0, 185)
+speedStatusLabel.BackgroundTransparency = 1
+speedStatusLabel.Text = "尚未設定速度"
+speedStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+speedStatusLabel.TextScaled = true
+speedStatusLabel.Font = Enum.Font.Gotham
+speedStatusLabel.Parent = SpeedPanel
+
+-- 開啟/關閉速度按鈕（預設禁用，直到確認設定）
+local toggleSpeedButton = Instance.new("TextButton")
+toggleSpeedButton.Name = "ToggleSpeedButton"
+toggleSpeedButton.Size = UDim2.new(0, 260, 0, 40)
+toggleSpeedButton.Position = UDim2.new(0, 20, 0, 220)
+toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+toggleSpeedButton.Text = "請先確認速度設定"
+toggleSpeedButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+toggleSpeedButton.TextScaled = true
+toggleSpeedButton.Active = false
+toggleSpeedButton.Parent = SpeedPanel
+
+local toggleSpeedCorner = Instance.new("UICorner")
+toggleSpeedCorner.CornerRadius = UDim.new(0, 8)
+toggleSpeedCorner.Parent = toggleSpeedButton
+
+-- 返回按鈕
+local speedBackButton = Instance.new("TextButton")
+speedBackButton.Name = "SpeedBackButton"
+speedBackButton.Size = UDim2.new(0, 260, 0, 40)
+speedBackButton.Position = UDim2.new(0, 20, 0, 260)  -- 緊貼在下方但這邊用padding處理，實際放在面板外不好，改調整面板高度
+speedBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+speedBackButton.Text = "返回主頁"
+speedBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBackButton.TextScaled = true
+speedBackButton.Parent = SpeedPanel
+
+local speedBackCorner = Instance.new("UICorner")
+speedBackCorner.CornerRadius = UDim.new(0, 8)
+speedBackCorner.Parent = speedBackButton
+
+-- 控制变量
+local isMoving = false
+local moveConnection = nil
+
+-- 移动功能
+teleportButton.MouseButton1Click:Connect(function()
+    if not Player.Character then return end
+    
+    local humanoidRootPart = Player.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    isMoving = true
+    
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "移動中",
+        Text = "正在移動，速度300...",
+        Duration = 3
+    })
+    
+    -- 獲取當前位置
+    local currentPos = humanoidRootPart.Position
+    local currentCFrame = humanoidRootPart.CFrame
+    
+    -- 向左旋轉90度（使船頭朝向移動方向的右側）
+    local rotatedCFrame = currentCFrame * CFrame.Angles(0, math.rad(90), 0)
+    
+    -- 執行初始位置設定 (高度180，並旋轉90度)
+    humanoidRootPart.CFrame = CFrame.new(currentPos.X, 180, currentPos.Z) * CFrame.Angles(0, math.rad(90), 0)
+    
+    -- 持續移動
+    moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not isMoving or not Player.Character then
+            moveConnection:Disconnect()
+            return
+        end
+        
+        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local currentPos = hrp.Position
+            -- 計算新的X位置，速度為300每秒，向負方向移動
+            local newX = currentPos.X - (300 * deltaTime)
+            
+            -- 設置新位置 (保持Z不變，高度180，X軸負方向移動，保持旋轉)
+            hrp.CFrame = CFrame.new(newX, 180, currentPos.Z) * CFrame.Angles(0, math.rad(90), 0)
+        end
+    end)
+end)
+
+-- 停止功能
+stopButton.MouseButton1Click:Connect(function()
+    isMoving = false
+    
+    if moveConnection then
+        moveConnection:Disconnect()
+        moveConnection = nil
+    end
+    
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "已停止",
+        Text = "移動已停止",
+        Duration = 3
+    })
+end)
+
+-- 信息按钮功能
+infoButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = true
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    updatePanelStatus()
+end)
+
+-- 返回按钮功能
+backButton.MouseButton1Click:Connect(function()
+    InfoPanel.Visible = false
+    MainPanel.Visible = true
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    updatePanelStatus()
+end)
+
+-- 自动战斗按钮点击事件
+autoBattleButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = false
+    BattlePanel.Visible = true
+    SpeedPanel.Visible = false
+    updatePanelStatus()
+end)
+
+-- 战斗面板返回按钮事件
+battleBackButton.MouseButton1Click:Connect(function()
+    BattlePanel.Visible = false
+    MainPanel.Visible = true
+    InfoPanel.Visible = false
+    SpeedPanel.Visible = false
+    updatePanelStatus()
+end)
+
+-- 速度设置按钮点击事件
+speedButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = true
+    updatePanelStatus()
+end)
+
+-- 速度面板返回按钮事件
+speedBackButton.MouseButton1Click:Connect(function()
+    SpeedPanel.Visible = false
+    MainPanel.Visible = true
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    updatePanelStatus()
+end)
+
+-- ========== 自动战斗功能代码开始 ==========
+local _G = _G or getgenv()
+_G.FastAttack = true
+
+local function SafeWaitForChild(parent, childName)
+    local success, result = pcall(function()
+        return parent:WaitForChild(childName)
+    end)
+    if not success or not result then
+        warn("找不到: " .. childName)
+    end
+    return result
+end
+
+local function WaitChilds(path, ...)
+    local last = path
+    for _, child in {...} do
+        last = last:FindFirstChild(child) or SafeWaitForChild(last, child)
+        if not last then break end
+    end
+    return last
+end
+
+local FastAttackModule = {}
+
+FastAttackModule.FastAttack = (function()
+    if getgenv().rz_FastAttack then
+        return getgenv().rz_FastAttack
+    end
+
+    local FastAttack = {
+        Distance = FastAttackSettings.Distance,
+        attackMobs = true,
+        attackPlayers = true,
+        Equipped = nil
+    }
+
+    local RegisterAttack = SafeWaitForChild(WaitChilds(ReplicatedStorage, "Modules", "Net"), "RE/RegisterAttack")
+    local RegisterHit = SafeWaitForChild(WaitChilds(ReplicatedStorage, "Modules", "Net"), "RE/RegisterHit")
+
+    local function IsAlive(character)
+        return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
+    end
+
+    local function ProcessEnemies(OthersEnemies, Folder)
+        local BasePart = nil
+        for _, Enemy in Folder:GetChildren() do
+            local Head = Enemy:FindFirstChild("Head")
+            if Head and IsAlive(Enemy) and Player:DistanceFromCharacter(Head.Position) < FastAttack.Distance then
+                if Enemy ~= Player.Character then
+                    table.insert(OthersEnemies, { Enemy, Head })
+                    BasePart = Head
+                end
+            end
+        end
+        return BasePart
+    end
+
+    function FastAttack:Attack(BasePart, OthersEnemies)
+        if not BasePart or #OthersEnemies == 0 then return end
+        if RegisterAttack and RegisterHit then
+            RegisterAttack:FireServer(FastAttackSettings.ClickDelay or 0)
+            RegisterHit:FireServer(BasePart, OthersEnemies)
+        end
+    end
+
+    function FastAttack:AttackNearest()
+        local OthersEnemies = {}
+        local Enemies = workspace:FindFirstChild("Enemies")
+        local Characters = workspace:FindFirstChild("Characters")
+        
+        if not Enemies or not Characters then return end
+        
+        local Part1 = ProcessEnemies(OthersEnemies, Enemies)
+        local Part2 = ProcessEnemies(OthersEnemies, Characters)
+        if #OthersEnemies > 0 then
+            self:Attack(Part1 or Part2, OthersEnemies)
+        else
+            task.wait(0)
+        end
+    end
+
+    function FastAttack:BladeHits()
+        if not Player.Character then return end
+        local Equipped = IsAlive(Player.Character) and Player.Character:FindFirstChildOfClass("Tool")
+        if Equipped and Equipped.ToolTip ~= "Gun" then
+            self:AttackNearest()
+        else
+            task.wait(0)
+        end
+    end
+
+    local battleLoop = nil
+    
+    function FastAttack:Start()
+        if battleLoop then return end
+        
+        battleLoop = task.spawn(function()
+            while FastAttackSettings.AutoClick do
+                if Player and Player.Character then
+                    self:BladeHits()
+                end
+                task.wait(FastAttackSettings.ClickDelay)
+            end
+            battleLoop = nil
+        end)
+        
+        -- 設置隊伍
+        if FastAttackSettings.Team == "Marines" then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
+        elseif FastAttackSettings.Team == "Pirates" then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+        end
+    end
+    
+    function FastAttack:Stop()
+        FastAttackSettings.AutoClick = false
+        if battleLoop then
+            task.cancel(battleLoop)
+            battleLoop = nil
+        end
+    end
+
+    getgenv().rz_FastAttack = FastAttack
+    return FastAttack
+end)()
+
+-- 自動選擇隊伍功能
+local function setupAutoTeam()
+    task.spawn(function()
+        while task.wait(1) do
+            if not FastAttackSettings.AutoClick then break end
+            
+            local chooseTeam = PlayerGui:FindFirstChild("ChooseTeam", true)
+            local uiController = PlayerGui:FindFirstChild("UIController", true)
+
+            if chooseTeam and chooseTeam.Visible and uiController then
+                for _, v in pairs(getgc(true)) do
+                    if type(v) == "function" and getfenv(v).script == uiController then
+                        local constant = getconstants(v)
+                        pcall(function()
+                            if (constant[1] == "Pirates" or constant[1] == "Marines") and #constant == 1 then
+                                if constant[1] == FastAttackSettings.Team then
+                                    v(FastAttackSettings.Team)
+                                end
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+end
+-- ========== 自动战斗功能代码结束 ==========
+
+-- 自動戰鬥開關按鈕事件
+toggleAutoBattleButton.MouseButton1Click:Connect(function()
+    FastAttackSettings.AutoClick = not FastAttackSettings.AutoClick
+    
+    if FastAttackSettings.AutoClick then
+        toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        toggleAutoBattleButton.Text = "開啟自動戰鬥"
+        
+        -- 啟動自動戰鬥
+        if FastAttackModule.FastAttack then
+            FastAttackModule.FastAttack:Start()
+        end
+        
+        -- 啟動自動選擇隊伍
+        setupAutoTeam()
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自動戰鬥",
+            Text = "自動戰鬥已開啟",
+            Duration = 3
+        })
+    else
+        toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        toggleAutoBattleButton.Text = "關閉自動戰鬥"
+        
+        -- 停止自動戰鬥
+        if FastAttackModule.FastAttack then
+            FastAttackModule.FastAttack:Stop()
+        end
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自動戰鬥",
+            Text = "自動戰鬥已關閉",
+            Duration = 3
+        })
+    end
+end)
+
+-- 隊伍選擇按鈕事件
+teamSelectButton.MouseButton1Click:Connect(function()
+    if FastAttackSettings.Team == "Marines" then
+        FastAttackSettings.Team = "Pirates"
+        teamSelectButton.Text = "隊伍: 海盜"
+        teamSelectButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)  -- 紅色系代表海盜
+    else
+        FastAttackSettings.Team = "Marines"
+        teamSelectButton.Text = "隊伍: 海軍"
+        teamSelectButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)  -- 藍色系代表海軍
+    end
+    
+    -- 立即應用隊伍變更
+    if FastAttackSettings.AutoClick then
+        if FastAttackSettings.Team == "Marines" then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
+        elseif FastAttackSettings.Team == "Pirates" then
+            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+        end
+    end
+end)
+
+-- ========== 速度控制功能代碼開始 ==========
+local isSpeedEnabled = false
+local confirmedSpeed = nil   -- 已確認的速度值，nil = 尚未設定
+local originalWalkSpeed = 16
+local speedLoop = nil
+
+local function setPlayerSpeed(speedValue)
+    local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if humanoid then
+        local ok = pcall(function()
+            humanoid.WalkSpeed = speedValue
+        end)
+        return ok
+    end
+    return false
+end
+
+local function getCurrentWalkSpeed()
+    local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if humanoid then return humanoid.WalkSpeed end
+    return 16
+end
+
+-- 確認速度設定按鈕
+confirmSpeedButton.MouseButton1Click:Connect(function()
+    -- 如果速度已開啟，不允許重新設定
+    if isSpeedEnabled then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "速度設置",
+            Text = "請先關閉速度再修改設定",
+            Duration = 3
+        })
+        return
+    end
+
+    local inputVal = tonumber(speedTextBox.Text)
+    if not inputVal or inputVal <= 0 or inputVal > 500 then
+        speedStatusLabel.Text = "❌ 請輸入有效速度值 (1~500)"
+        speedStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        speedTextBox.Text = ""
+        return
+    end
+
+    confirmedSpeed = inputVal
+    speedStatusLabel.Text = "✔ 已設定速度: " .. confirmedSpeed .. "  (可開啟)"
+    speedStatusLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
+
+    -- 解鎖開啟按鈕
+    toggleSpeedButton.Active = true
+    toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+    toggleSpeedButton.Text = "開啟速度修改"
+    toggleSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "速度設置",
+        Text = "速度已確認設定為 " .. confirmedSpeed .. "，可以開啟了",
+        Duration = 3
+    })
+end)
+
+-- 開啟/關閉速度按鈕
+toggleSpeedButton.MouseButton1Click:Connect(function()
+    -- 尚未確認設定，不做任何事
+    if not confirmedSpeed then return end
+
+    isSpeedEnabled = not isSpeedEnabled
+
+    if isSpeedEnabled then
+        -- 鎖定輸入框和確認按鈕，防止修改
+        speedTextBox.Editable = false
+        speedTextBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        speedTextBox.TextColor3 = Color3.fromRGB(130, 130, 130)
+        confirmSpeedButton.Active = false
+        confirmSpeedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        confirmSpeedButton.TextColor3 = Color3.fromRGB(130, 130, 130)
+
+        toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        toggleSpeedButton.Text = "關閉速度修改"
+
+        speedStatusLabel.Text = "🟢 速度運行中: " .. confirmedSpeed
+        speedStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+
+        -- 儲存原始速度
+        originalWalkSpeed = getCurrentWalkSpeed()
+
+        -- 立即套用
+        setPlayerSpeed(confirmedSpeed)
+
+        -- 持續維持速度循環
+        speedLoop = task.spawn(function()
+            while isSpeedEnabled do
+                local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
+                if humanoid then
+                    pcall(function()
+                        humanoid.WalkSpeed = confirmedSpeed
+                    end)
+                end
+                task.wait(0.1)
+            end
+            speedLoop = nil
+        end)
+
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "速度修改",
+            Text = "已開啟速度修改，速度: " .. confirmedSpeed,
+            Duration = 3
+        })
+    else
+        -- 停止循環
+        isSpeedEnabled = false
+        if speedLoop then
+            task.cancel(speedLoop)
+            speedLoop = nil
+        end
+
+        -- 恢復原始速度
+        setPlayerSpeed(originalWalkSpeed)
+
+        -- 解鎖輸入框和確認按鈕
+        speedTextBox.Editable = true
+        speedTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        confirmSpeedButton.Active = true
+        confirmSpeedButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
+        confirmSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+        toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        toggleSpeedButton.Text = "開啟速度修改"
+
+        confirmedSpeed = nil
+        speedTextBox.Text = ""
+        speedStatusLabel.Text = "已關閉，請重新輸入速度設定"
+        speedStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+
+        -- 重設開啟按鈕為灰色，等待重新確認
+        toggleSpeedButton.Active = false
+        toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        toggleSpeedButton.Text = "請先確認速度設定"
+        toggleSpeedButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "速度修改",
+            Text = "已關閉速度修改，恢復原始速度",
+            Duration = 3
+        })
+    end
+end)
+-- ========== 速度控制功能代碼結束 ==========
+
+-- 更新所有面板顯示狀態的函數
+local function updatePanelStatus()
+    -- 根據面板狀態改變圖標顏色
+    if MainPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100) -- 綠色表示主面板打開
+    elseif InfoPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255) -- 藍色表示信息面板打開
+    elseif BattlePanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50) -- 橙色表示戰鬥面板打開
+    elseif SpeedPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255) -- 青色表示速度面板打開
+    else
+        IconButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- 白色表示所有面板關閉
+        IconButton.BackgroundTransparency = 0.5
+    end
+end
+
+-- 圖標點擊事件（修復版，可以關閉所有面板）
+IconButton.MouseButton1Click:Connect(function()
+    -- 如果任何面板是顯示的，則全部關閉
+    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible then
+        MainPanel.Visible = false
+        InfoPanel.Visible = false
+        BattlePanel.Visible = false
+        SpeedPanel.Visible = false
+    else
+        -- 如果所有面板都是隱藏的，則顯示主面板
+        MainPanel.Visible = true
+    end
+    updatePanelStatus() -- 更新圖標狀態
+end)
+
+-- ========== 飛到Tiki功能代碼開始 ==========
+-- 飛行控制變量（飛到Tiki）
+local isFlyingToTiki = false
+local flyConnection = nil
+local targetX = -16542  -- Tiki島X座標
+local targetZ = 1044    -- Tiki島Z座標
+local initialY = 500    -- 初始飛行高度
+local finalY = 800      -- 最終飛行高度
+local targetY = initialY -- 當前目標高度
+local flightPhase = "ascending" -- 飛行階段: "ascending", "waiting", "ascendingTo800", "horizontal", "descending"
+local waitTimer = 0
+
+-- 檢查是否到達目標位置
+local function hasReachedTarget(currentPos)
+    local tolerance = 5  -- 容錯範圍
+    return math.abs(currentPos.X - targetX) < tolerance and math.abs(currentPos.Z - targetZ) < tolerance
+end
+
+-- 檢測下方是否有地面
+local function findGroundBelow(position)
+    local rayOrigin = Vector3.new(position.X, position.Y + 10, position.Z)
+    local rayDirection = Vector3.new(0, -1000, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    if Player.Character then
+        raycastParams.FilterDescendantsInstances = {Player.Character}
+    end
+    
+    local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    
+    if raycastResult then
+        return raycastResult.Position.Y + 5  -- 在地面位置上方5單位
+    end
+    
+    return position.Y - 100  -- 如果沒檢測到，下降100單位
+end
+
+-- 飛行功能
+local function startFlyToTiki()
+    if not Player.Character then 
+        warn("沒有找到玩家角色")
+        return 
+    end
+    
+    local humanoidRootPart = Player.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then 
+        warn("沒有找到 HumanoidRootPart")
+        return 
+    end
+    
+    -- 如果正在飛行，先停止
+    if isFlyingToTiki and flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    
+    -- 重置飛行狀態
+    isFlyingToTiki = true
+    flightPhase = "ascending"
+    targetY = initialY
+    waitTimer = 0
+    
+    -- 顯示開始通知
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "飛往 Tiki 島",
+        Text = "正在起飛到高度 500...",
+        Duration = 3
+    })
+    
+    local currentPos = humanoidRootPart.Position
+    
+    -- 第一步：立即上升到 Y=500
+    humanoidRootPart.CFrame = CFrame.new(currentPos.X, targetY, currentPos.Z)
+    
+    -- 飛行循環
+    flyConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not isFlyingToTiki or not Player.Character then
+            if flyConnection then
+                flyConnection:Disconnect()
+                flyConnection = nil
+            end
+            return
+        end
+        
+        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            if flyConnection then
+                flyConnection:Disconnect()
+                flyConnection = nil
+            end
+            return
+        end
+        
+        local currentPos = hrp.Position
+        
+        -- 飛行階段控制
+        if flightPhase == "ascending" then
+            -- 已經在500高度，切換到等待階段
+            flightPhase = "waiting"
+            
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "等待中",
+                Text = "在高度 500 等待 1 秒...",
+                Duration = 1
+            })
+            
+        elseif flightPhase == "waiting" then
+            -- 等待1秒階段
+            waitTimer = waitTimer + deltaTime
+            
+            -- 保持在500高度
+            hrp.CFrame = CFrame.new(currentPos.X, initialY, currentPos.Z)
+            
+            if waitTimer >= 1 then
+                -- 等待結束，切換到上升到800階段
+                flightPhase = "ascendingTo800"
+                targetY = finalY
+                
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "上升中",
+                    Text = "正在上升到高度 800...",
+                    Duration = 2
+                })
+            end
+            
+        elseif flightPhase == "ascendingTo800" then
+            -- 上升到800高度
+            hrp.CFrame = CFrame.new(currentPos.X, finalY, currentPos.Z)
+            
+            -- 切換到水平飛行階段
+            flightPhase = "horizontal"
+            
+        elseif flightPhase == "horizontal" then
+            -- 水平飛行階段
+            if hasReachedTarget(currentPos) then
+                -- 到達目標位置，開始下降
+                flightPhase = "descending"
+                
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "到達 Tiki 島",
+                    Text = "正在下降尋找地面...",
+                    Duration = 3
+                })
+            else
+                -- 計算朝向目標的方向
+                local direction = Vector3.new(targetX, targetY, targetZ) - currentPos
+                local horizontalDirection = Vector3.new(direction.X, 0, direction.Z)
+                
+                if horizontalDirection.Magnitude > 0 then
+                    -- 標準化方向並計算移動距離
+                    horizontalDirection = horizontalDirection.Unit
+                    local moveDistance = 300 * deltaTime
+                    
+                    -- 如果剩餘距離小於移動距離，直接跳到目標
+                    if horizontalDirection.Magnitude * moveDistance > direction.Magnitude then
+                        hrp.CFrame = CFrame.new(targetX, targetY, targetZ)
+                    else
+                        -- 計算新位置
+                        local newX = currentPos.X + horizontalDirection.X * moveDistance
+                        local newZ = currentPos.Z + horizontalDirection.Z * moveDistance
+                        
+                        -- 移動到新位置（保持高度targetY）
+                        hrp.CFrame = CFrame.new(newX, targetY, newZ)
+                    end
+                end
+            end
+            
+        elseif flightPhase == "descending" then
+            -- 下降階段
+            local groundY = findGroundBelow(currentPos)
+            
+            if math.abs(currentPos.Y - groundY) < 2 then
+                -- 已經接近地面，停止下降
+                hrp.CFrame = CFrame.new(currentPos.X, groundY, currentPos.Z)
+                isFlyingToTiki = false
+                
+                if flyConnection then
+                    flyConnection:Disconnect()
+                    flyConnection = nil
+                end
+                
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "成功著陸",
+                    Text = "已到達 Tiki 島地面",
+                    Duration = 3
+                })
+            else
+                -- 繼續下降
+                local descendSpeed = 100  -- 下降速度
+                local newY = currentPos.Y - descendSpeed * deltaTime
+                
+                if newY < groundY then
+                    newY = groundY
+                end
+                
+                hrp.CFrame = CFrame.new(currentPos.X, newY, currentPos.Z)
+            end
+        end
+    end)
+end
+-- ========== 飛到Tiki功能代碼結束 ==========
+
+-- 飛到Tiki按鈕的點擊事件
+flyToTikiButton.MouseButton1Click:Connect(function()
+    startFlyToTiki()
+    
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "提示",
+        Text = "正在飛往 Tiki 島...",
+        Duration = 3
+    })
+end)
+
+-- 初始更新面板状态
+updatePanelStatus()
