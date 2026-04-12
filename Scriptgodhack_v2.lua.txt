@@ -846,12 +846,46 @@ teamSelectButton.MouseButton1Click:Connect(function()
 end)
 
 -- ========== 速度控制功能代碼開始 ==========
-local speedConnection = nil  -- Heartbeat 連接，用來持續覆蓋速度
+local speedConnection = nil
+local currentSpeedValue = nil
+
+local function applySpeed(val)
+    local char = Player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        -- 直接用 rawset 繞過任何 __newindex 保護
+        pcall(function() hum.WalkSpeed = val end)
+        pcall(function() hum.JumpPower = hum.JumpPower end) -- 保持跳躍不變
+    end
+end
+
+local function startSpeedLoop(val)
+    -- 停掉舊的
+    if speedConnection then
+        speedConnection:Disconnect()
+        speedConnection = nil
+    end
+
+    currentSpeedValue = val
+
+    -- 每幀強制蓋，Heartbeat 比 Stepped 更晚執行，能蓋過遊戲的更新
+    speedConnection = RunService.Heartbeat:Connect(function()
+        applySpeed(currentSpeedValue)
+    end)
+end
+
+-- 角色重生時自動重新套用
+Player.CharacterAdded:Connect(function()
+    if currentSpeedValue then
+        task.wait(0.5) -- 等角色完整載入
+        startSpeedLoop(currentSpeedValue)
+    end
+end)
 
 -- 確認按鈕點擊事件
 confirmSpeedButton.MouseButton1Click:Connect(function()
-    local inputText = speedTextBox.Text
-    local inputVal = tonumber(inputText)
+    local inputVal = tonumber(speedTextBox.Text)
 
     -- 檢查是否為數字
     if not inputVal then
@@ -863,22 +897,8 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
         return
     end
 
-    -- 數字有效，直接套用
-    -- 先停掉舊的連接（如果有）
-    if speedConnection then
-        speedConnection:Disconnect()
-        speedConnection = nil
-    end
-
-    -- 用 Heartbeat 每幀強制覆蓋，蓋過 Blox Fruits 的重置
-    speedConnection = RunService.Heartbeat:Connect(function()
-        local char = Player.Character
-        if not char then return end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = inputVal
-        end
-    end)
+    -- 套用速度
+    startSpeedLoop(inputVal)
 
     -- 顯示目前設定的速度
     speedStatusLabel.Text = "目前速度設定: " .. inputVal
