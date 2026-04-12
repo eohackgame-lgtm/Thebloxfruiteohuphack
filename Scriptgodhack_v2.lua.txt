@@ -429,7 +429,7 @@ battleBackCorner.Parent = battleBackButton
 -- 创建速度设置面板
 local SpeedPanel = Instance.new("Frame")
 SpeedPanel.Name = "SpeedPanel"
-SpeedPanel.Size = UDim2.new(0, 300, 0, 310)
+SpeedPanel.Size = UDim2.new(0, 300, 0, 230)
 SpeedPanel.Position = UDim2.new(0, 90, 0, 20)
 SpeedPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 SpeedPanel.BackgroundTransparency = 0.1
@@ -452,42 +452,31 @@ speedTitle.TextScaled = true
 speedTitle.Font = Enum.Font.GothamBold
 speedTitle.Parent = SpeedPanel
 
--- 提示說明
-local speedHint = Instance.new("TextLabel")
-speedHint.Name = "SpeedHint"
-speedHint.Size = UDim2.new(0, 260, 0, 30)
-speedHint.Position = UDim2.new(0, 20, 0, 48)
-speedHint.BackgroundTransparency = 1
-speedHint.Text = "請先輸入速度，再點擊確認後才能開啟"
-speedHint.TextColor3 = Color3.fromRGB(180, 180, 180)
-speedHint.TextScaled = true
-speedHint.Font = Enum.Font.Gotham
-speedHint.Parent = SpeedPanel
-
 -- 速度輸入框
 local speedTextBox = Instance.new("TextBox")
 speedTextBox.Name = "SpeedTextBox"
 speedTextBox.Size = UDim2.new(0, 260, 0, 40)
-speedTextBox.Position = UDim2.new(0, 20, 0, 88)
+speedTextBox.Position = UDim2.new(0, 20, 0, 52)
 speedTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedTextBox.Font = Enum.Font.Gotham
 speedTextBox.TextScaled = true
-speedTextBox.PlaceholderText = "輸入速度值 (預設: 16)"
+speedTextBox.PlaceholderText = "輸入移動速度數字"
 speedTextBox.Text = ""
+speedTextBox.ClearTextOnFocus = false
 speedTextBox.Parent = SpeedPanel
 
 local speedTextBoxCorner = Instance.new("UICorner")
 speedTextBoxCorner.CornerRadius = UDim.new(0, 8)
 speedTextBoxCorner.Parent = speedTextBox
 
--- 確認設定按鈕（輸入後點此確認，才能開啟）
+-- 確認按鈕
 local confirmSpeedButton = Instance.new("TextButton")
 confirmSpeedButton.Name = "ConfirmSpeedButton"
 confirmSpeedButton.Size = UDim2.new(0, 260, 0, 40)
-confirmSpeedButton.Position = UDim2.new(0, 20, 0, 138)
+confirmSpeedButton.Position = UDim2.new(0, 20, 0, 100)
 confirmSpeedButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-confirmSpeedButton.Text = "確認設定速度"
+confirmSpeedButton.Text = "確認"
 confirmSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 confirmSpeedButton.TextScaled = true
 confirmSpeedButton.Parent = SpeedPanel
@@ -496,39 +485,23 @@ local confirmSpeedCorner = Instance.new("UICorner")
 confirmSpeedCorner.CornerRadius = UDim.new(0, 8)
 confirmSpeedCorner.Parent = confirmSpeedButton
 
--- 目前設定顯示
+-- 目前速度顯示（確認後才出現）
 local speedStatusLabel = Instance.new("TextLabel")
 speedStatusLabel.Name = "SpeedStatusLabel"
-speedStatusLabel.Size = UDim2.new(0, 260, 0, 30)
-speedStatusLabel.Position = UDim2.new(0, 20, 0, 185)
+speedStatusLabel.Size = UDim2.new(0, 260, 0, 28)
+speedStatusLabel.Position = UDim2.new(0, 20, 0, 148)
 speedStatusLabel.BackgroundTransparency = 1
-speedStatusLabel.Text = "尚未設定速度"
-speedStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+speedStatusLabel.Text = ""
+speedStatusLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
 speedStatusLabel.TextScaled = true
 speedStatusLabel.Font = Enum.Font.Gotham
 speedStatusLabel.Parent = SpeedPanel
-
--- 開啟/關閉速度按鈕（預設禁用，直到確認設定）
-local toggleSpeedButton = Instance.new("TextButton")
-toggleSpeedButton.Name = "ToggleSpeedButton"
-toggleSpeedButton.Size = UDim2.new(0, 260, 0, 40)
-toggleSpeedButton.Position = UDim2.new(0, 20, 0, 220)
-toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-toggleSpeedButton.Text = "請先確認速度設定"
-toggleSpeedButton.TextColor3 = Color3.fromRGB(180, 180, 180)
-toggleSpeedButton.TextScaled = true
-toggleSpeedButton.Active = false
-toggleSpeedButton.Parent = SpeedPanel
-
-local toggleSpeedCorner = Instance.new("UICorner")
-toggleSpeedCorner.CornerRadius = UDim.new(0, 8)
-toggleSpeedCorner.Parent = toggleSpeedButton
 
 -- 返回按鈕
 local speedBackButton = Instance.new("TextButton")
 speedBackButton.Name = "SpeedBackButton"
 speedBackButton.Size = UDim2.new(0, 260, 0, 40)
-speedBackButton.Position = UDim2.new(0, 20, 0, 260)  -- 緊貼在下方但這邊用padding處理，實際放在面板外不好，改調整面板高度
+speedBackButton.Position = UDim2.new(0, 20, 0, 182)
 speedBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
 speedBackButton.Text = "返回主頁"
 speedBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -873,151 +846,42 @@ teamSelectButton.MouseButton1Click:Connect(function()
 end)
 
 -- ========== 速度控制功能代碼開始 ==========
-local isSpeedEnabled = false
-local confirmedSpeed = nil   -- 已確認的速度值，nil = 尚未設定
-local originalWalkSpeed = 16
-local speedLoop = nil
+local speedConnection = nil  -- Heartbeat 連接，用來持續覆蓋速度
 
-local function setPlayerSpeed(speedValue)
-    local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-    if humanoid then
-        local ok = pcall(function()
-            humanoid.WalkSpeed = speedValue
-        end)
-        return ok
-    end
-    return false
-end
-
-local function getCurrentWalkSpeed()
-    local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-    if humanoid then return humanoid.WalkSpeed end
-    return 16
-end
-
--- 確認速度設定按鈕
+-- 確認按鈕點擊事件
 confirmSpeedButton.MouseButton1Click:Connect(function()
-    -- 如果速度已開啟，不允許重新設定
-    if isSpeedEnabled then
+    local inputText = speedTextBox.Text
+    local inputVal = tonumber(inputText)
+
+    -- 檢查是否為數字
+    if not inputVal then
         game.StarterGui:SetCore("SendNotification", {
             Title = "速度設置",
-            Text = "請先關閉速度再修改設定",
+            Text = "設定失敗，請輸入數字",
             Duration = 3
         })
         return
     end
 
-    local inputVal = tonumber(speedTextBox.Text)
-    if not inputVal or inputVal <= 0 or inputVal > 500 then
-        speedStatusLabel.Text = "❌ 請輸入有效速度值 (1~500)"
-        speedStatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        speedTextBox.Text = ""
-        return
+    -- 數字有效，直接套用
+    -- 先停掉舊的連接（如果有）
+    if speedConnection then
+        speedConnection:Disconnect()
+        speedConnection = nil
     end
 
-    confirmedSpeed = inputVal
-    speedStatusLabel.Text = "✔ 已設定速度: " .. confirmedSpeed .. "  (可開啟)"
-    speedStatusLabel.TextColor3 = Color3.fromRGB(100, 220, 100)
-
-    -- 解鎖開啟按鈕
-    toggleSpeedButton.Active = true
-    toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-    toggleSpeedButton.Text = "開啟速度修改"
-    toggleSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-    game.StarterGui:SetCore("SendNotification", {
-        Title = "速度設置",
-        Text = "速度已確認設定為 " .. confirmedSpeed .. "，可以開啟了",
-        Duration = 3
-    })
-end)
-
--- 開啟/關閉速度按鈕
-toggleSpeedButton.MouseButton1Click:Connect(function()
-    -- 尚未確認設定，不做任何事
-    if not confirmedSpeed then return end
-
-    isSpeedEnabled = not isSpeedEnabled
-
-    if isSpeedEnabled then
-        -- 鎖定輸入框和確認按鈕，防止修改
-        speedTextBox.Editable = false
-        speedTextBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        speedTextBox.TextColor3 = Color3.fromRGB(130, 130, 130)
-        confirmSpeedButton.Active = false
-        confirmSpeedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        confirmSpeedButton.TextColor3 = Color3.fromRGB(130, 130, 130)
-
-        toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        toggleSpeedButton.Text = "關閉速度修改"
-
-        speedStatusLabel.Text = "🟢 速度運行中: " .. confirmedSpeed
-        speedStatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-
-        -- 儲存原始速度
-        originalWalkSpeed = getCurrentWalkSpeed()
-
-        -- 立即套用
-        setPlayerSpeed(confirmedSpeed)
-
-        -- 持續維持速度循環
-        speedLoop = task.spawn(function()
-            while isSpeedEnabled do
-                local humanoid = Player.Character and Player.Character:FindFirstChild("Humanoid")
-                if humanoid then
-                    pcall(function()
-                        humanoid.WalkSpeed = confirmedSpeed
-                    end)
-                end
-                task.wait(0.1)
-            end
-            speedLoop = nil
-        end)
-
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "速度修改",
-            Text = "已開啟速度修改，速度: " .. confirmedSpeed,
-            Duration = 3
-        })
-    else
-        -- 停止循環
-        isSpeedEnabled = false
-        if speedLoop then
-            task.cancel(speedLoop)
-            speedLoop = nil
+    -- 用 Heartbeat 每幀強制覆蓋，蓋過 Blox Fruits 的重置
+    speedConnection = RunService.Heartbeat:Connect(function()
+        local char = Player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = inputVal
         end
+    end)
 
-        -- 恢復原始速度
-        setPlayerSpeed(originalWalkSpeed)
-
-        -- 解鎖輸入框和確認按鈕
-        speedTextBox.Editable = true
-        speedTextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-        confirmSpeedButton.Active = true
-        confirmSpeedButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-        confirmSpeedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-        toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        toggleSpeedButton.Text = "開啟速度修改"
-
-        confirmedSpeed = nil
-        speedTextBox.Text = ""
-        speedStatusLabel.Text = "已關閉，請重新輸入速度設定"
-        speedStatusLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
-
-        -- 重設開啟按鈕為灰色，等待重新確認
-        toggleSpeedButton.Active = false
-        toggleSpeedButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        toggleSpeedButton.Text = "請先確認速度設定"
-        toggleSpeedButton.TextColor3 = Color3.fromRGB(180, 180, 180)
-
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "速度修改",
-            Text = "已關閉速度修改，恢復原始速度",
-            Duration = 3
-        })
-    end
+    -- 顯示目前設定的速度
+    speedStatusLabel.Text = "目前速度設定: " .. inputVal
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
