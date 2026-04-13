@@ -850,29 +850,36 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
 end)
 
 -- ========== 速度控制功能代碼開始 ==========
+local TweenService = game:GetService("TweenService")
 local speedConnection = nil
 local currentSpeedValue = nil
 
-local function applySpeed(val)
-    local char = Player.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    -- 嘗試用 sethiddenproperty 繞過保護，失敗則用普通賦值
-    local ok = pcall(sethiddenproperty, hum, "WalkSpeed", val)
-    if not ok then
-        pcall(function() hum.WalkSpeed = val end)
-    end
-end
-
 local function startSpeedLoop(val)
+    -- 停掉舊的
     if speedConnection then
         speedConnection:Disconnect()
         speedConnection = nil
     end
     currentSpeedValue = val
+
+    -- 用 TweenService 每幀持續推動角色朝移動方向前進
+    -- 這跟英文腳本同一個原理，直接操作 HumanoidRootPart，繞過遊戲速度限制
     speedConnection = RunService.Heartbeat:Connect(function()
-        applySpeed(currentSpeedValue)
+        local char = Player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        -- 只在玩家有在移動時才套用（偵測移動方向）
+        local moveDir = hum.MoveDirection
+        if moveDir.Magnitude > 0.1 then
+            local distance = currentSpeedValue * 0.05  -- 每幀移動距離
+            local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
+            local targetCFrame = CFrame.new(hrp.Position + moveDir * distance) * (hrp.CFrame - hrp.Position)
+            local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+            tween:Play()
+        end
     end)
 end
 
