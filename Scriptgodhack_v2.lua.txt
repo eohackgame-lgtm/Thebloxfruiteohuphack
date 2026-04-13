@@ -358,7 +358,7 @@ infoTextCorner.Parent = infoText
 -- 創建自動戰鬥面板
 local BattlePanel = Instance.new("Frame")
 BattlePanel.Name = "BattlePanel"
-BattlePanel.Size = UDim2.new(0, 300, 0, 230)
+BattlePanel.Size = UDim2.new(0, 300, 0, 285)
 BattlePanel.Position = UDim2.new(0, 90, 0, 20)
 BattlePanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 BattlePanel.BackgroundTransparency = 0.1
@@ -369,10 +369,10 @@ local BattlePanelCorner = Instance.new("UICorner")
 BattlePanelCorner.CornerRadius = UDim.new(0.05, 0)
 BattlePanelCorner.Parent = BattlePanel
 
--- 在自動戰鬥面板添加標題
+-- 標題
 local battleTitle = Instance.new("TextLabel")
 battleTitle.Name = "BattleTitle"
-battleTitle.Size = UDim2.new(0, 260, 0, 40)
+battleTitle.Size = UDim2.new(0, 260, 0, 35)
 battleTitle.Position = UDim2.new(0, 20, 0, 10)
 battleTitle.BackgroundTransparency = 1
 battleTitle.Text = "自動戰鬥設置"
@@ -381,11 +381,41 @@ battleTitle.TextScaled = true
 battleTitle.Font = Enum.Font.GothamBold
 battleTitle.Parent = BattlePanel
 
--- 在自動戰鬥面板添加開關按鈕
+-- 重生成海盜按鈕
+local respawnPirateButton = Instance.new("TextButton")
+respawnPirateButton.Name = "RespawnPirateButton"
+respawnPirateButton.Size = UDim2.new(0, 260, 0, 40)
+respawnPirateButton.Position = UDim2.new(0, 20, 0, 55)
+respawnPirateButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+respawnPirateButton.Text = "重生成海盜"
+respawnPirateButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+respawnPirateButton.TextScaled = true
+respawnPirateButton.Parent = BattlePanel
+
+local respawnPirateCorner = Instance.new("UICorner")
+respawnPirateCorner.CornerRadius = UDim.new(0, 8)
+respawnPirateCorner.Parent = respawnPirateButton
+
+-- 重生成海軍按鈕
+local respawnMarineButton = Instance.new("TextButton")
+respawnMarineButton.Name = "RespawnMarineButton"
+respawnMarineButton.Size = UDim2.new(0, 260, 0, 40)
+respawnMarineButton.Position = UDim2.new(0, 20, 0, 103)
+respawnMarineButton.BackgroundColor3 = Color3.fromRGB(60, 100, 200)
+respawnMarineButton.Text = "重生成海軍"
+respawnMarineButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+respawnMarineButton.TextScaled = true
+respawnMarineButton.Parent = BattlePanel
+
+local respawnMarineCorner = Instance.new("UICorner")
+respawnMarineCorner.CornerRadius = UDim.new(0, 8)
+respawnMarineCorner.Parent = respawnMarineButton
+
+-- 自動戰鬥開關按鈕（在海軍下面）
 local toggleAutoBattleButton = Instance.new("TextButton")
 toggleAutoBattleButton.Name = "ToggleAutoBattleButton"
 toggleAutoBattleButton.Size = UDim2.new(0, 260, 0, 40)
-toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 60)
+toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 151)
 toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
 toggleAutoBattleButton.Text = "關閉自動戰鬥"
 toggleAutoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -396,26 +426,11 @@ local toggleAutoBattleCorner = Instance.new("UICorner")
 toggleAutoBattleCorner.CornerRadius = UDim.new(0, 8)
 toggleAutoBattleCorner.Parent = toggleAutoBattleButton
 
--- 在自動戰鬥面板添加隊伍選擇按鈕
-local teamSelectButton = Instance.new("TextButton")
-teamSelectButton.Name = "TeamSelectButton"
-teamSelectButton.Size = UDim2.new(0, 260, 0, 40)
-teamSelectButton.Position = UDim2.new(0, 20, 0, 110)
-teamSelectButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-teamSelectButton.Text = "隊伍: 海軍"
-teamSelectButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-teamSelectButton.TextScaled = true
-teamSelectButton.Parent = BattlePanel
-
-local teamSelectCorner = Instance.new("UICorner")
-teamSelectCorner.CornerRadius = UDim.new(0, 8)
-teamSelectCorner.Parent = teamSelectButton
-
--- 在自動戰鬥面板添加返回按鈕
+-- 返回按鈕
 local battleBackButton = Instance.new("TextButton")
 battleBackButton.Name = "BattleBackButton"
 battleBackButton.Size = UDim2.new(0, 260, 0, 40)
-battleBackButton.Position = UDim2.new(0, 20, 0, 165)
+battleBackButton.Position = UDim2.new(0, 20, 0, 230)
 battleBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
 battleBackButton.Text = "返回主頁"
 battleBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -736,13 +751,6 @@ FastAttackModule.FastAttack = (function()
             end
             battleLoop = nil
         end)
-        
-        -- 設置隊伍
-        if FastAttackSettings.Team == "Marines" then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
-        elseif FastAttackSettings.Team == "Pirates" then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
-        end
     end
     
     function FastAttack:Stop()
@@ -785,6 +793,32 @@ local function setupAutoTeam()
 end
 -- ========== 自动战斗功能代码结束 ==========
 
+-- 重生成海盜按鈕事件
+respawnPirateButton.MouseButton1Click:Connect(function()
+    FastAttackSettings.Team = "Pirates"
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
+    end)
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "陣營",
+        Text = "已切換為海盜",
+        Duration = 3
+    })
+end)
+
+-- 重生成海軍按鈕事件
+respawnMarineButton.MouseButton1Click:Connect(function()
+    FastAttackSettings.Team = "Marines"
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
+    end)
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "陣營",
+        Text = "已切換為海軍",
+        Duration = 3
+    })
+end)
+
 -- 自動戰鬥開關按鈕事件
 toggleAutoBattleButton.MouseButton1Click:Connect(function()
     FastAttackSettings.AutoClick = not FastAttackSettings.AutoClick
@@ -792,15 +826,10 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
     if FastAttackSettings.AutoClick then
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
         toggleAutoBattleButton.Text = "開啟自動戰鬥"
-        
-        -- 啟動自動戰鬥
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Start()
         end
-        
-        -- 啟動自動選擇隊伍
         setupAutoTeam()
-        
         game.StarterGui:SetCore("SendNotification", {
             Title = "自動戰鬥",
             Text = "自動戰鬥已開啟",
@@ -809,39 +838,14 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
     else
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         toggleAutoBattleButton.Text = "關閉自動戰鬥"
-        
-        -- 停止自動戰鬥
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Stop()
         end
-        
         game.StarterGui:SetCore("SendNotification", {
             Title = "自動戰鬥",
             Text = "自動戰鬥已關閉",
             Duration = 3
         })
-    end
-end)
-
--- 隊伍選擇按鈕事件
-teamSelectButton.MouseButton1Click:Connect(function()
-    if FastAttackSettings.Team == "Marines" then
-        FastAttackSettings.Team = "Pirates"
-        teamSelectButton.Text = "隊伍: 海盜"
-        teamSelectButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)  -- 紅色系代表海盜
-    else
-        FastAttackSettings.Team = "Marines"
-        teamSelectButton.Text = "隊伍: 海軍"
-        teamSelectButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)  -- 藍色系代表海軍
-    end
-    
-    -- 立即應用隊伍變更
-    if FastAttackSettings.AutoClick then
-        if FastAttackSettings.Team == "Marines" then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Marines")
-        elseif FastAttackSettings.Team == "Pirates" then
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("SetTeam", "Pirates")
-        end
     end
 end)
 
@@ -853,23 +857,20 @@ local function applySpeed(val)
     local char = Player.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        -- 直接用 rawset 繞過任何 __newindex 保護
+    if not hum then return end
+    -- 嘗試用 sethiddenproperty 繞過保護，失敗則用普通賦值
+    local ok = pcall(sethiddenproperty, hum, "WalkSpeed", val)
+    if not ok then
         pcall(function() hum.WalkSpeed = val end)
-        pcall(function() hum.JumpPower = hum.JumpPower end) -- 保持跳躍不變
     end
 end
 
 local function startSpeedLoop(val)
-    -- 停掉舊的
     if speedConnection then
         speedConnection:Disconnect()
         speedConnection = nil
     end
-
     currentSpeedValue = val
-
-    -- 每幀強制蓋，Heartbeat 比 Stepped 更晚執行，能蓋過遊戲的更新
     speedConnection = RunService.Heartbeat:Connect(function()
         applySpeed(currentSpeedValue)
     end)
@@ -878,7 +879,7 @@ end
 -- 角色重生時自動重新套用
 Player.CharacterAdded:Connect(function()
     if currentSpeedValue then
-        task.wait(0.5) -- 等角色完整載入
+        task.wait(0.5)
         startSpeedLoop(currentSpeedValue)
     end
 end)
@@ -886,8 +887,6 @@ end)
 -- 確認按鈕點擊事件
 confirmSpeedButton.MouseButton1Click:Connect(function()
     local inputVal = tonumber(speedTextBox.Text)
-
-    -- 檢查是否為數字
     if not inputVal then
         game.StarterGui:SetCore("SendNotification", {
             Title = "速度設置",
@@ -896,11 +895,7 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
         })
         return
     end
-
-    -- 套用速度
     startSpeedLoop(inputVal)
-
-    -- 顯示目前設定的速度
     speedStatusLabel.Text = "目前速度設定: " .. inputVal
 end)
 -- ========== 速度控制功能代碼結束 ==========
