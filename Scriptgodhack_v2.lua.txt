@@ -198,7 +198,7 @@ UICorner.Parent = IconButton
 -- 創建主面板 (高度改為400，是原本200的2倍)
 local MainPanel = Instance.new("Frame")
 MainPanel.Name = "MainPanel"
-MainPanel.Size = UDim2.new(0, 300, 0, 450)  -- 高度改為400
+MainPanel.Size = UDim2.new(0, 300, 0, 500)
 MainPanel.Position = UDim2.new(0, 90, 0, 20)
 MainPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainPanel.BackgroundTransparency = 0.1
@@ -276,12 +276,12 @@ infoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 infoButton.TextScaled = true
 infoButton.Parent = MainPanel
 
--- 在主面板添加自動戰鬥按钮 (放在飛到Tiki按鈕下方)
+-- 在主面板添加自動戰鬥按钮
 local autoBattleButton = Instance.new("TextButton")
 autoBattleButton.Name = "AutoBattleButton"
 autoBattleButton.Size = UDim2.new(0, 150, 0, 40)
 autoBattleButton.Position = UDim2.new(0, 20, 0, 220)
-autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)  -- 橙色系
+autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)
 autoBattleButton.Text = "自動戰鬥設置"
 autoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoBattleButton.TextScaled = true
@@ -291,12 +291,12 @@ local autoBattleCorner = Instance.new("UICorner")
 autoBattleCorner.CornerRadius = UDim.new(0, 8)
 autoBattleCorner.Parent = autoBattleButton
 
--- 在主面板添加速度设置按钮 (放在自动战斗按钮右侧)
+-- 在主面板添加速度设置按钮
 local speedButton = Instance.new("TextButton")
 speedButton.Name = "SpeedButton"
 speedButton.Size = UDim2.new(0, 150, 0, 40)
-speedButton.Position = UDim2.new(0, 160, 0, 220)  -- X=160 (右侧)，Y=220 (与自动战斗按钮同一行)
-speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)  -- 蓝色系
+speedButton.Position = UDim2.new(0, 160, 0, 220)
+speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
 speedButton.Text = "速度设置"
 speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedButton.TextScaled = true
@@ -305,6 +305,21 @@ speedButton.Parent = MainPanel
 local speedCorner = Instance.new("UICorner")
 speedCorner.CornerRadius = UDim.new(0, 8)
 speedCorner.Parent = speedButton
+
+-- ESP 按鈕（放在自動戰鬥和速度下方）
+local espButton = Instance.new("TextButton")
+espButton.Name = "EspButton"
+espButton.Size = UDim2.new(0, 260, 0, 40)
+espButton.Position = UDim2.new(0, 20, 0, 270)
+espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+espButton.Text = "ESP 開啟"
+espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+espButton.TextScaled = true
+espButton.Parent = MainPanel
+
+local espCorner = Instance.new("UICorner")
+espCorner.CornerRadius = UDim.new(0, 8)
+espCorner.Parent = espButton
 
 -- 在信息页面添加返回按钮
 local backButton = Instance.new("TextButton")
@@ -850,36 +865,29 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
 end)
 
 -- ========== 速度控制功能代碼開始 ==========
-local TweenService = game:GetService("TweenService")
 local speedConnection = nil
 local currentSpeedValue = nil
 
+local function applySpeed(val)
+    local char = Player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    -- 嘗試用 sethiddenproperty 繞過保護，失敗則用普通賦值
+    local ok = pcall(sethiddenproperty, hum, "WalkSpeed", val)
+    if not ok then
+        pcall(function() hum.WalkSpeed = val end)
+    end
+end
+
 local function startSpeedLoop(val)
-    -- 停掉舊的
     if speedConnection then
         speedConnection:Disconnect()
         speedConnection = nil
     end
     currentSpeedValue = val
-
-    -- 用 TweenService 每幀持續推動角色朝移動方向前進
-    -- 這跟英文腳本同一個原理，直接操作 HumanoidRootPart，繞過遊戲速度限制
     speedConnection = RunService.Heartbeat:Connect(function()
-        local char = Player.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
-
-        -- 只在玩家有在移動時才套用（偵測移動方向）
-        local moveDir = hum.MoveDirection
-        if moveDir.Magnitude > 0.1 then
-            local distance = currentSpeedValue * 0.05  -- 每幀移動距離
-            local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
-            local targetCFrame = CFrame.new(hrp.Position + moveDir * distance) * (hrp.CFrame - hrp.Position)
-            local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-            tween:Play()
-        end
+        applySpeed(currentSpeedValue)
     end)
 end
 
@@ -1152,6 +1160,130 @@ flyToTikiButton.MouseButton1Click:Connect(function()
         Duration = 3
     })
 end)
+
+-- ========== ESP 功能代碼開始 ==========
+local espEnabled = false
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ESPFolder"
+espFolder.Parent = workspace
+
+local camera = workspace.CurrentCamera
+
+-- 取得玩家等級
+local function getPlayerLevel(targetPlayer)
+    local ok, level = pcall(function()
+        return targetPlayer.Data.Level.Value
+    end)
+    if ok and level then
+        return tostring(level)
+    end
+    return "?"
+end
+
+-- 幫一個玩家建立 ESP 標籤
+local function createESP(targetPlayer)
+    -- 避免重複建立
+    if espFolder:FindFirstChild(targetPlayer.Name) then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = targetPlayer.Name
+    billboard.Size = UDim2.new(0, 160, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)  -- 頭頂上方
+    billboard.AlwaysOnTop = true                   -- 穿牆也看得到
+    billboard.Enabled = true
+    billboard.Parent = espFolder
+
+    -- 名字標籤
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.Position = UDim2.new(0, 0, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 100)  -- 黃色
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = targetPlayer.Name
+    nameLabel.TextStrokeTransparency = 0  -- 黑色描邊，更好讀
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.Parent = billboard
+
+    -- 等級標籤
+    local levelLabel = Instance.new("TextLabel")
+    levelLabel.Name = "LevelLabel"
+    levelLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    levelLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    levelLabel.BackgroundTransparency = 1
+    levelLabel.TextColor3 = Color3.fromRGB(100, 220, 255)  -- 淡藍色
+    levelLabel.TextScaled = true
+    levelLabel.Font = Enum.Font.Gotham
+    levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
+    levelLabel.TextStrokeTransparency = 0
+    levelLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    levelLabel.Parent = billboard
+
+    -- 持續更新等級和位置
+    local updateConnection
+    updateConnection = RunService.Heartbeat:Connect(function()
+        -- 如果 ESP 被關閉，或玩家離開，清除
+        if not espEnabled or not targetPlayer or not targetPlayer.Parent then
+            billboard:Destroy()
+            updateConnection:Disconnect()
+            return
+        end
+
+        local char = targetPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                billboard.Adornee = hrp
+            end
+        end
+
+        -- 每 3 秒更新一次等級（避免每幀都讀）
+        levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
+    end)
+end
+
+-- 移除所有 ESP
+local function clearAllESP()
+    for _, child in ipairs(espFolder:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+-- 對所有目前玩家建立 ESP
+local function buildAllESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player then  -- 不顯示自己
+            createESP(p)
+        end
+    end
+end
+
+-- 有新玩家加入時自動建立
+Players.PlayerAdded:Connect(function(p)
+    if espEnabled then
+        createESP(p)
+    end
+end)
+
+-- 玩家離開時清除（billboard 的 updateConnection 內部會自動清除）
+
+-- ESP 按鈕點擊事件
+espButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+
+    if espEnabled then
+        espButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        espButton.Text = "ESP 關閉"
+        buildAllESP()
+    else
+        espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+        espButton.Text = "ESP 開啟"
+        clearAllESP()
+    end
+end)
+-- ========== ESP 功能代碼結束 ==========
 
 -- 初始更新面板状态
 updatePanelStatus()
