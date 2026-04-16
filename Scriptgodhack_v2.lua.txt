@@ -198,7 +198,7 @@ UICorner.Parent = IconButton
 -- 創建主面板
 local MainPanel = Instance.new("Frame")
 MainPanel.Name = "MainPanel"
-MainPanel.Size = UDim2.new(0, 300, 0, 430)
+MainPanel.Size = UDim2.new(0, 300, 0, 350)
 MainPanel.Position = UDim2.new(0, 90, 0, 20)
 MainPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainPanel.BackgroundTransparency = 0.1
@@ -208,6 +208,64 @@ MainPanel.Parent = ScreenGui
 local MainPanelCorner = Instance.new("UICorner")
 MainPanelCorner.CornerRadius = UDim.new(0.05, 0)
 MainPanelCorner.Parent = MainPanel
+
+-- 主面板標題列
+local MainPanelTitle = Instance.new("TextLabel")
+MainPanelTitle.Size = UDim2.new(1, 0, 0, 35)
+MainPanelTitle.Position = UDim2.new(0, 0, 0, 0)
+MainPanelTitle.BackgroundTransparency = 1
+MainPanelTitle.Text = "eoHub 主選單"
+MainPanelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+MainPanelTitle.TextScaled = true
+MainPanelTitle.Font = Enum.Font.GothamBold
+MainPanelTitle.Parent = MainPanel
+
+-- ScrollingFrame（可上下滑動的內容區）
+local MainScroll = Instance.new("ScrollingFrame")
+MainScroll.Name = "MainScroll"
+MainScroll.Size = UDim2.new(1, 0, 1, -40)
+MainScroll.Position = UDim2.new(0, 0, 0, 38)
+MainScroll.BackgroundTransparency = 1
+MainScroll.ScrollBarThickness = 4
+MainScroll.ScrollBarImageColor3 = Color3.fromRGB(150, 150, 150)
+MainScroll.CanvasSize = UDim2.new(0, 0, 0, 0) -- 等按鈕加完自動計算
+MainScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+MainScroll.Parent = MainPanel
+
+-- UIListLayout 自動排列按鈕，不用手動設 Position
+local MainListLayout = Instance.new("UIListLayout")
+MainListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+MainListLayout.Padding = UDim.new(0, 8)
+MainListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+MainListLayout.Parent = MainScroll
+
+local UIPadding = Instance.new("UIPadding")
+UIPadding.PaddingTop = UDim.new(0, 6)
+UIPadding.Parent = MainScroll
+
+-- 建立按鈕的輔助函數
+local function makeMainButton(text, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 260, 0, 42)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = MainScroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+-- 所有主面板按鈕（由上到下順序）
+local teleportButton   = makeMainButton("自動海上飛行", Color3.fromRGB(80, 200, 120))
+local stopButton       = makeMainButton("停止移動",     Color3.fromRGB(200, 80, 80))
+local flyToTikiButton  = makeMainButton("飛到 Tiki 島", Color3.fromRGB(180, 100, 220))
+local espFruitButton   = makeMainButton("ESP 果實",     Color3.fromRGB(220, 130, 50))
+local speedButton      = makeMainButton("速度設置",     Color3.fromRGB(100, 180, 255))
+local autoBattleButton = makeMainButton("自動戰鬥設置", Color3.fromRGB(220, 150, 80))
+local espButton        = makeMainButton("ESP 玩家 開啟",Color3.fromRGB(180, 80, 200))
+local infoButton       = makeMainButton("顯示信息",     Color3.fromRGB(80, 120, 200))
 
 -- 創建信息頁面面板
 local InfoPanel = Instance.new("Frame")
@@ -232,104 +290,6 @@ local FastAttackSettings = {
 }
 -- ========== 自動戰鬥系統設置結束 ==========
 
--- 所有主面板按鈕統一寬度 260，左邊距 20，每個按鈕高 40，間距 10
-
--- 自動海上飛行
-local teleportButton = Instance.new("TextButton")
-teleportButton.Name = "TeleportButton"
-teleportButton.Size = UDim2.new(0, 260, 0, 40)
-teleportButton.Position = UDim2.new(0, 20, 0, 15)
-teleportButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-teleportButton.Text = "自動海上飛行"
-teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-teleportButton.TextScaled = true
-teleportButton.Parent = MainPanel
-Instance.new("UICorner", teleportButton).CornerRadius = UDim.new(0, 8)
-
--- 停止移動
-local stopButton = Instance.new("TextButton")
-stopButton.Name = "StopButton"
-stopButton.Size = UDim2.new(0, 260, 0, 40)
-stopButton.Position = UDim2.new(0, 20, 0, 65)
-stopButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-stopButton.Text = "停止移動"
-stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopButton.TextScaled = true
-stopButton.Parent = MainPanel
-Instance.new("UICorner", stopButton).CornerRadius = UDim.new(0, 8)
-
--- 飛到Tiki
-local flyToTikiButton = Instance.new("TextButton")
-flyToTikiButton.Name = "FlyToTikiButton"
-flyToTikiButton.Size = UDim2.new(0, 260, 0, 40)
-flyToTikiButton.Position = UDim2.new(0, 20, 0, 115)
-flyToTikiButton.BackgroundColor3 = Color3.fromRGB(180, 100, 220)
-flyToTikiButton.Text = "飛到 Tiki 島"
-flyToTikiButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyToTikiButton.TextScaled = true
-flyToTikiButton.Parent = MainPanel
-Instance.new("UICorner", flyToTikiButton).CornerRadius = UDim.new(0, 8)
-
--- 傳送船到身邊
-local shipTeleportButton = Instance.new("TextButton")
-shipTeleportButton.Name = "ShipTeleportButton"
-shipTeleportButton.Size = UDim2.new(0, 260, 0, 40)
-shipTeleportButton.Position = UDim2.new(0, 20, 0, 165)
-shipTeleportButton.BackgroundColor3 = Color3.fromRGB(60, 160, 200)
-shipTeleportButton.Text = "傳送船到身邊"
-shipTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-shipTeleportButton.TextScaled = true
-shipTeleportButton.Parent = MainPanel
-Instance.new("UICorner", shipTeleportButton).CornerRadius = UDim.new(0, 8)
-
--- 速度設置
-local speedButton = Instance.new("TextButton")
-speedButton.Name = "SpeedButton"
-speedButton.Size = UDim2.new(0, 260, 0, 40)
-speedButton.Position = UDim2.new(0, 20, 0, 215)
-speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
-speedButton.Text = "速度設置"
-speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedButton.TextScaled = true
-speedButton.Parent = MainPanel
-Instance.new("UICorner", speedButton).CornerRadius = UDim.new(0, 8)
-
--- 自動戰鬥設置
-local autoBattleButton = Instance.new("TextButton")
-autoBattleButton.Name = "AutoBattleButton"
-autoBattleButton.Size = UDim2.new(0, 260, 0, 40)
-autoBattleButton.Position = UDim2.new(0, 20, 0, 265)
-autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)
-autoBattleButton.Text = "自動戰鬥設置"
-autoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoBattleButton.TextScaled = true
-autoBattleButton.Parent = MainPanel
-Instance.new("UICorner", autoBattleButton).CornerRadius = UDim.new(0, 8)
-
--- ESP
-local espButton = Instance.new("TextButton")
-espButton.Name = "EspButton"
-espButton.Size = UDim2.new(0, 260, 0, 40)
-espButton.Position = UDim2.new(0, 20, 0, 315)
-espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-espButton.Text = "ESP 開啟"
-espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-espButton.TextScaled = true
-espButton.Parent = MainPanel
-Instance.new("UICorner", espButton).CornerRadius = UDim.new(0, 8)
-
--- 顯示信息
-local infoButton = Instance.new("TextButton")
-infoButton.Name = "InfoButton"
-infoButton.Size = UDim2.new(0, 260, 0, 40)
-infoButton.Position = UDim2.new(0, 20, 0, 365)
-infoButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-infoButton.Text = "顯示信息"
-infoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-infoButton.TextScaled = true
-infoButton.Parent = MainPanel
-Instance.new("UICorner", infoButton).CornerRadius = UDim.new(0, 8)
-
 -- 在信息页面添加返回按钮
 local backButton = Instance.new("TextButton")
 backButton.Name = "BackButton"
@@ -353,31 +313,6 @@ infoText.TextColor3 = Color3.fromRGB(255, 255, 255)
 infoText.TextScaled = true
 infoText.Font = Enum.Font.Gotham
 infoText.Parent = InfoPanel
-
--- 为所有按钮添加圆角
-local teleportCorner = Instance.new("UICorner")
-teleportCorner.CornerRadius = UDim.new(0, 8)
-teleportCorner.Parent = teleportButton
-
-local stopCorner = Instance.new("UICorner")
-stopCorner.CornerRadius = UDim.new(0, 8)
-stopCorner.Parent = stopButton
-
-local infoCorner = Instance.new("UICorner")
-infoCorner.CornerRadius = UDim.new(0, 8)
-infoCorner.Parent = infoButton
-
-local flyToTikiCorner = Instance.new("UICorner")
-flyToTikiCorner.CornerRadius = UDim.new(0, 8)
-flyToTikiCorner.Parent = flyToTikiButton
-
-local backCorner = Instance.new("UICorner")
-backCorner.CornerRadius = UDim.new(0, 8)
-backCorner.Parent = backButton
-
-local infoTextCorner = Instance.new("UICorner")
-infoTextCorner.CornerRadius = UDim.new(0, 8)
-infoTextCorner.Parent = infoText
 
 -- 創建自動戰鬥面板
 local BattlePanel = Instance.new("Frame")
@@ -614,63 +549,6 @@ stopButton.MouseButton1Click:Connect(function()
         Duration = 3
     })
 end)
-
--- ========== 傳送船到身邊功能 ==========
-shipTeleportButton.MouseButton1Click:Connect(function()
-    if not Player.Character then return end
-    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local playerPos = hrp.Position
-    local found = false
-
-    -- 搜尋所有可能的船（Blox Fruits 的船通常在 workspace 下）
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        -- 判斷是否是屬於自己的船（有 Owner 或 PlayerBoat 之類的標記）
-        local isOwnedByMe = false
-
-        -- 方法1：檢查 Owner 屬性
-        local ownerVal = obj:FindFirstChild("Owner")
-        if ownerVal and ownerVal.Value == Player then
-            isOwnedByMe = true
-        end
-
-        -- 方法2：檢查名稱是否含有玩家名
-        if obj.Name:find(Player.Name) then
-            isOwnedByMe = true
-        end
-
-        if isOwnedByMe and obj:IsA("Model") then
-            -- 找到船，傳送到玩家旁邊
-            local shipRoot = obj:FindFirstChild("Seat") or obj:FindFirstChild("VehicleSeat") or obj.PrimaryPart
-            if shipRoot then
-                -- 傳送到玩家右側 15 格
-                local targetPos = playerPos + Vector3.new(15, 0, 0)
-                obj:SetPrimaryPartCFrame(CFrame.new(targetPos))
-                found = true
-                game.StarterGui:SetCore("SendNotification", {
-                    Title = "傳送船",
-                    Text = "已將船傳送到你身邊",
-                    Duration = 3
-                })
-                break
-            end
-        end
-    end
-
-    -- 如果上面找不到，嘗試用 Remotes 召喚（部分執行器支援）
-    if not found then
-        pcall(function()
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("CallBoat")
-        end)
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "傳送船",
-            Text = "已發送召喚船指令",
-            Duration = 3
-        })
-    end
-end)
--- ========== 傳送船到身邊功能結束 ==========
 
 -- 信息按钮功能
 infoButton.MouseButton1Click:Connect(function()
@@ -941,7 +819,6 @@ local function startSpeedLoop(val)
         speedConnection = nil
     end
     currentSpeedValue = val
-
     speedConnection = RunService.Heartbeat:Connect(function()
         local char = Player.Character
         if not char then return end
@@ -1334,21 +1211,106 @@ end)
 
 -- 玩家離開時清除（billboard 的 updateConnection 內部會自動清除）
 
--- ESP 按鈕點擊事件
+-- ESP 玩家按鈕點擊事件
 espButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
 
     if espEnabled then
         espButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        espButton.Text = "ESP 關閉"
+        espButton.Text = "ESP 玩家 關閉"
         buildAllESP()
     else
         espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-        espButton.Text = "ESP 開啟"
+        espButton.Text = "ESP 玩家 開啟"
         clearAllESP()
     end
 end)
 -- ========== ESP 功能代碼結束 ==========
+
+-- ========== ESP 果實功能代碼開始 ==========
+local espFruitEnabled = false
+local fruitEspFolder = Instance.new("Folder")
+fruitEspFolder.Name = "FruitESPFolder"
+fruitEspFolder.Parent = workspace
+
+local fruitEspConnection = nil
+
+-- Blox Fruits 掉落果實通常在 workspace 下的 "Fruits" 或 "DroppedFruits" Folder
+-- 每個果實是一個 Model，裡面有 BillboardGui 或 Part，名字就是果實名稱
+local function scanFruits()
+    -- 先清除舊的標籤
+    for _, v in ipairs(fruitEspFolder:GetChildren()) do
+        v:Destroy()
+    end
+
+    -- 搜尋常見的果實容器名稱
+    local containers = {"Fruits", "DroppedFruits", "MapItems"}
+    for _, containerName in ipairs(containers) do
+        local container = workspace:FindFirstChild(containerName)
+        if container then
+            for _, fruit in ipairs(container:GetChildren()) do
+                local part = fruit:IsA("BasePart") and fruit
+                    or (fruit:IsA("Model") and (fruit.PrimaryPart or fruit:FindFirstChildOfClass("BasePart")))
+                if part then
+                    -- 避免重複
+                    if not fruitEspFolder:FindFirstChild(fruit.Name .. "_" .. tostring(fruit:GetHashCode and fruit:GetHashCode() or math.random())) then
+                        local bb = Instance.new("BillboardGui")
+                        bb.Name = fruit.Name
+                        bb.Size = UDim2.new(0, 140, 0, 40)
+                        bb.StudsOffset = Vector3.new(0, 4, 0)
+                        bb.AlwaysOnTop = true
+                        bb.Adornee = part
+                        bb.Parent = fruitEspFolder
+
+                        local lbl = Instance.new("TextLabel")
+                        lbl.Size = UDim2.new(1, 0, 1, 0)
+                        lbl.BackgroundTransparency = 1
+                        lbl.Text = "🍎 " .. fruit.Name
+                        lbl.TextColor3 = Color3.fromRGB(255, 220, 50)
+                        lbl.TextScaled = true
+                        lbl.Font = Enum.Font.GothamBold
+                        lbl.TextStrokeTransparency = 0
+                        lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                        lbl.Parent = bb
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ESP 果實按鈕事件
+espFruitButton.MouseButton1Click:Connect(function()
+    espFruitEnabled = not espFruitEnabled
+
+    if espFruitEnabled then
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        espFruitButton.Text = "ESP 果實 關閉"
+
+        -- 立即掃一次，之後每 2 秒更新（果實會不斷生成消失）
+        scanFruits()
+        fruitEspConnection = task.spawn(function()
+            while espFruitEnabled do
+                task.wait(2)
+                if espFruitEnabled then
+                    scanFruits()
+                end
+            end
+        end)
+    else
+        espFruitEnabled = false
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
+        espFruitButton.Text = "ESP 果實"
+        if fruitEspConnection then
+            task.cancel(fruitEspConnection)
+            fruitEspConnection = nil
+        end
+        for _, v in ipairs(fruitEspFolder:GetChildren()) do
+            v:Destroy()
+        end
+    end
+end)
+-- ========== ESP 果實功能代碼結束 ==========
 
 -- 初始更新面板状态
 updatePanelStatus()
