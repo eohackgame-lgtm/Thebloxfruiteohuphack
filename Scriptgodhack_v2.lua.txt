@@ -195,10 +195,10 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0.2, 0)
 UICorner.Parent = IconButton
 
--- 創建主面板
+-- 創建主面板 (高度改為400，是原本200的2倍)
 local MainPanel = Instance.new("Frame")
 MainPanel.Name = "MainPanel"
-MainPanel.Size = UDim2.new(0, 300, 0, 430)
+MainPanel.Size = UDim2.new(0, 300, 0, 500)
 MainPanel.Position = UDim2.new(0, 90, 0, 20)
 MainPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainPanel.BackgroundTransparency = 0.1
@@ -232,103 +232,94 @@ local FastAttackSettings = {
 }
 -- ========== 自動戰鬥系統設置結束 ==========
 
--- 所有主面板按鈕統一寬度 260，左邊距 20，每個按鈕高 40，間距 10
+-- 在主面板添加飛到Tiki的按钮 (新增按鈕，放在原按鈕下方)
+local flyToTikiButton = Instance.new("TextButton")
+flyToTikiButton.Name = "FlyToTikiButton"
+flyToTikiButton.Size = UDim2.new(0, 150, 0, 40)
+flyToTikiButton.Position = UDim2.new(0, 20, 0, 170)
+flyToTikiButton.BackgroundColor3 = Color3.fromRGB(180, 100, 220)  -- 紫色系
+flyToTikiButton.Text = "飛到Tiki"
+flyToTikiButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyToTikiButton.TextScaled = true
+flyToTikiButton.Parent = MainPanel
 
--- 自動海上飛行
+-- 在主面板添加传送按钮
 local teleportButton = Instance.new("TextButton")
 teleportButton.Name = "TeleportButton"
-teleportButton.Size = UDim2.new(0, 260, 0, 40)
-teleportButton.Position = UDim2.new(0, 20, 0, 15)
+teleportButton.Size = UDim2.new(0, 150, 0, 40)
+teleportButton.Position = UDim2.new(0, 20, 0, 20)
 teleportButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-teleportButton.Text = "自動海上飛行"
+teleportButton.Text = "自動海上飛行(標準位置在司法後面啟飛)"
 teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 teleportButton.TextScaled = true
 teleportButton.Parent = MainPanel
-Instance.new("UICorner", teleportButton).CornerRadius = UDim.new(0, 8)
 
--- 停止移動
+-- 在主面板添加停止按钮
 local stopButton = Instance.new("TextButton")
 stopButton.Name = "StopButton"
-stopButton.Size = UDim2.new(0, 260, 0, 40)
-stopButton.Position = UDim2.new(0, 20, 0, 65)
+stopButton.Size = UDim2.new(0, 150, 0, 40)
+stopButton.Position = UDim2.new(0, 20, 0, 70)
 stopButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
 stopButton.Text = "停止移動"
 stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 stopButton.TextScaled = true
 stopButton.Parent = MainPanel
-Instance.new("UICorner", stopButton).CornerRadius = UDim.new(0, 8)
 
--- 飛到Tiki
-local flyToTikiButton = Instance.new("TextButton")
-flyToTikiButton.Name = "FlyToTikiButton"
-flyToTikiButton.Size = UDim2.new(0, 260, 0, 40)
-flyToTikiButton.Position = UDim2.new(0, 20, 0, 115)
-flyToTikiButton.BackgroundColor3 = Color3.fromRGB(180, 100, 220)
-flyToTikiButton.Text = "飛到 Tiki 島"
-flyToTikiButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyToTikiButton.TextScaled = true
-flyToTikiButton.Parent = MainPanel
-Instance.new("UICorner", flyToTikiButton).CornerRadius = UDim.new(0, 8)
-
--- 傳送船到身邊
-local shipTeleportButton = Instance.new("TextButton")
-shipTeleportButton.Name = "ShipTeleportButton"
-shipTeleportButton.Size = UDim2.new(0, 260, 0, 40)
-shipTeleportButton.Position = UDim2.new(0, 20, 0, 165)
-shipTeleportButton.BackgroundColor3 = Color3.fromRGB(60, 160, 200)
-shipTeleportButton.Text = "傳送船到身邊"
-shipTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-shipTeleportButton.TextScaled = true
-shipTeleportButton.Parent = MainPanel
-Instance.new("UICorner", shipTeleportButton).CornerRadius = UDim.new(0, 8)
-
--- 速度設置
-local speedButton = Instance.new("TextButton")
-speedButton.Name = "SpeedButton"
-speedButton.Size = UDim2.new(0, 260, 0, 40)
-speedButton.Position = UDim2.new(0, 20, 0, 215)
-speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
-speedButton.Text = "速度設置"
-speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedButton.TextScaled = true
-speedButton.Parent = MainPanel
-Instance.new("UICorner", speedButton).CornerRadius = UDim.new(0, 8)
-
--- 自動戰鬥設置
-local autoBattleButton = Instance.new("TextButton")
-autoBattleButton.Name = "AutoBattleButton"
-autoBattleButton.Size = UDim2.new(0, 260, 0, 40)
-autoBattleButton.Position = UDim2.new(0, 20, 0, 265)
-autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)
-autoBattleButton.Text = "自動戰鬥設置"
-autoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoBattleButton.TextScaled = true
-autoBattleButton.Parent = MainPanel
-Instance.new("UICorner", autoBattleButton).CornerRadius = UDim.new(0, 8)
-
--- ESP
-local espButton = Instance.new("TextButton")
-espButton.Name = "EspButton"
-espButton.Size = UDim2.new(0, 260, 0, 40)
-espButton.Position = UDim2.new(0, 20, 0, 315)
-espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-espButton.Text = "ESP 開啟"
-espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-espButton.TextScaled = true
-espButton.Parent = MainPanel
-Instance.new("UICorner", espButton).CornerRadius = UDim.new(0, 8)
-
--- 顯示信息
+-- 在主面板添加信息页面按钮
 local infoButton = Instance.new("TextButton")
 infoButton.Name = "InfoButton"
-infoButton.Size = UDim2.new(0, 260, 0, 40)
-infoButton.Position = UDim2.new(0, 20, 0, 365)
+infoButton.Size = UDim2.new(0, 150, 0, 40)
+infoButton.Position = UDim2.new(0, 20, 0, 120)
 infoButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
 infoButton.Text = "顯示信息"
 infoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 infoButton.TextScaled = true
 infoButton.Parent = MainPanel
-Instance.new("UICorner", infoButton).CornerRadius = UDim.new(0, 8)
+
+-- 在主面板添加自動戰鬥按钮
+local autoBattleButton = Instance.new("TextButton")
+autoBattleButton.Name = "AutoBattleButton"
+autoBattleButton.Size = UDim2.new(0, 150, 0, 40)
+autoBattleButton.Position = UDim2.new(0, 20, 0, 220)
+autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)
+autoBattleButton.Text = "自動戰鬥設置"
+autoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoBattleButton.TextScaled = true
+autoBattleButton.Parent = MainPanel
+
+local autoBattleCorner = Instance.new("UICorner")
+autoBattleCorner.CornerRadius = UDim.new(0, 8)
+autoBattleCorner.Parent = autoBattleButton
+
+-- 在主面板添加速度设置按钮
+local speedButton = Instance.new("TextButton")
+speedButton.Name = "SpeedButton"
+speedButton.Size = UDim2.new(0, 150, 0, 40)
+speedButton.Position = UDim2.new(0, 160, 0, 220)
+speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+speedButton.Text = "速度设置"
+speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedButton.TextScaled = true
+speedButton.Parent = MainPanel
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 8)
+speedCorner.Parent = speedButton
+
+-- ESP 按鈕（放在自動戰鬥和速度下方）
+local espButton = Instance.new("TextButton")
+espButton.Name = "EspButton"
+espButton.Size = UDim2.new(0, 260, 0, 40)
+espButton.Position = UDim2.new(0, 20, 0, 270)
+espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+espButton.Text = "ESP 開啟"
+espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+espButton.TextScaled = true
+espButton.Parent = MainPanel
+
+local espCorner = Instance.new("UICorner")
+espCorner.CornerRadius = UDim.new(0, 8)
+espCorner.Parent = espButton
 
 -- 在信息页面添加返回按钮
 local backButton = Instance.new("TextButton")
@@ -555,6 +546,26 @@ speedBackCorner.Parent = speedBackButton
 local isMoving = false
 local moveConnection = nil
 
+-- ========== updatePanelStatus 定義（必須在所有按鈕事件之前）==========
+local function updatePanelStatus()
+    if MainPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
+        IconButton.BackgroundTransparency = 0
+    elseif InfoPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+        IconButton.BackgroundTransparency = 0
+    elseif BattlePanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+        IconButton.BackgroundTransparency = 0
+    elseif SpeedPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255)
+        IconButton.BackgroundTransparency = 0
+    else
+        IconButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        IconButton.BackgroundTransparency = 0.5
+    end
+end
+
 -- 移动功能
 teleportButton.MouseButton1Click:Connect(function()
     if not Player.Character then return end
@@ -614,63 +625,6 @@ stopButton.MouseButton1Click:Connect(function()
         Duration = 3
     })
 end)
-
--- ========== 傳送船到身邊功能 ==========
-shipTeleportButton.MouseButton1Click:Connect(function()
-    if not Player.Character then return end
-    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local playerPos = hrp.Position
-    local found = false
-
-    -- 搜尋所有可能的船（Blox Fruits 的船通常在 workspace 下）
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        -- 判斷是否是屬於自己的船（有 Owner 或 PlayerBoat 之類的標記）
-        local isOwnedByMe = false
-
-        -- 方法1：檢查 Owner 屬性
-        local ownerVal = obj:FindFirstChild("Owner")
-        if ownerVal and ownerVal.Value == Player then
-            isOwnedByMe = true
-        end
-
-        -- 方法2：檢查名稱是否含有玩家名
-        if obj.Name:find(Player.Name) then
-            isOwnedByMe = true
-        end
-
-        if isOwnedByMe and obj:IsA("Model") then
-            -- 找到船，傳送到玩家旁邊
-            local shipRoot = obj:FindFirstChild("Seat") or obj:FindFirstChild("VehicleSeat") or obj.PrimaryPart
-            if shipRoot then
-                -- 傳送到玩家右側 15 格
-                local targetPos = playerPos + Vector3.new(15, 0, 0)
-                obj:SetPrimaryPartCFrame(CFrame.new(targetPos))
-                found = true
-                game.StarterGui:SetCore("SendNotification", {
-                    Title = "傳送船",
-                    Text = "已將船傳送到你身邊",
-                    Duration = 3
-                })
-                break
-            end
-        end
-    end
-
-    -- 如果上面找不到，嘗試用 Remotes 召喚（部分執行器支援）
-    if not found then
-        pcall(function()
-            ReplicatedStorage.Remotes.CommF_:InvokeServer("CallBoat")
-        end)
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "傳送船",
-            Text = "已發送召喚船指令",
-            Duration = 3
-        })
-    end
-end)
--- ========== 傳送船到身邊功能結束 ==========
 
 -- 信息按钮功能
 infoButton.MouseButton1Click:Connect(function()
@@ -931,9 +885,20 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
 end)
 
 -- ========== 速度控制功能代碼開始 ==========
-local TweenService = game:GetService("TweenService")
 local speedConnection = nil
 local currentSpeedValue = nil
+
+local function applySpeed(val)
+    local char = Player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    -- 嘗試用 sethiddenproperty 繞過保護，失敗則用普通賦值
+    local ok = pcall(sethiddenproperty, hum, "WalkSpeed", val)
+    if not ok then
+        pcall(function() hum.WalkSpeed = val end)
+    end
+end
 
 local function startSpeedLoop(val)
     if speedConnection then
@@ -941,23 +906,12 @@ local function startSpeedLoop(val)
         speedConnection = nil
     end
     currentSpeedValue = val
-
     speedConnection = RunService.Heartbeat:Connect(function()
-        local char = Player.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
-        local moveDir = hum.MoveDirection
-        if moveDir.Magnitude > 0.1 then
-            local distance = currentSpeedValue * 0.05
-            local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
-            local targetCFrame = CFrame.new(hrp.Position + moveDir * distance) * (hrp.CFrame - hrp.Position)
-            TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame}):Play()
-        end
+        applySpeed(currentSpeedValue)
     end)
 end
 
+-- 角色重生時自動重新套用
 Player.CharacterAdded:Connect(function()
     if currentSpeedValue then
         task.wait(0.5)
@@ -965,6 +919,7 @@ Player.CharacterAdded:Connect(function()
     end
 end)
 
+-- 確認按鈕點擊事件
 confirmSpeedButton.MouseButton1Click:Connect(function()
     local inputVal = tonumber(speedTextBox.Text)
     if not inputVal then
@@ -981,22 +936,6 @@ end)
 -- ========== 速度控制功能代碼結束 ==========
 
 -- 更新所有面板顯示狀態的函數
-local function updatePanelStatus()
-    -- 根據面板狀態改變圖標顏色
-    if MainPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100) -- 綠色表示主面板打開
-    elseif InfoPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255) -- 藍色表示信息面板打開
-    elseif BattlePanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50) -- 橙色表示戰鬥面板打開
-    elseif SpeedPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255) -- 青色表示速度面板打開
-    else
-        IconButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- 白色表示所有面板關閉
-        IconButton.BackgroundTransparency = 0.5
-    end
-end
-
 -- 圖標點擊事件（修復版，可以關閉所有面板）
 IconButton.MouseButton1Click:Connect(function()
     -- 如果任何面板是顯示的，則全部關閉
