@@ -195,10 +195,10 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0.2, 0)
 UICorner.Parent = IconButton
 
--- 創建主面板 (高度改為400，是原本200的2倍)
+-- 創建主面板
 local MainPanel = Instance.new("Frame")
 MainPanel.Name = "MainPanel"
-MainPanel.Size = UDim2.new(0, 300, 0, 500)
+MainPanel.Size = UDim2.new(0, 300, 0, 350)
 MainPanel.Position = UDim2.new(0, 90, 0, 20)
 MainPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 MainPanel.BackgroundTransparency = 0.1
@@ -208,6 +208,63 @@ MainPanel.Parent = ScreenGui
 local MainPanelCorner = Instance.new("UICorner")
 MainPanelCorner.CornerRadius = UDim.new(0.05, 0)
 MainPanelCorner.Parent = MainPanel
+
+-- 主面板標題
+local MainPanelTitle = Instance.new("TextLabel")
+MainPanelTitle.Size = UDim2.new(1, 0, 0, 35)
+MainPanelTitle.Position = UDim2.new(0, 0, 0, 0)
+MainPanelTitle.BackgroundTransparency = 1
+MainPanelTitle.Text = "eoHub 主選單"
+MainPanelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+MainPanelTitle.TextScaled = true
+MainPanelTitle.Font = Enum.Font.GothamBold
+MainPanelTitle.Parent = MainPanel
+
+-- 可上下滑動的 ScrollingFrame
+local MainScroll = Instance.new("ScrollingFrame")
+MainScroll.Name = "MainScroll"
+MainScroll.Size = UDim2.new(1, 0, 1, -38)
+MainScroll.Position = UDim2.new(0, 0, 0, 38)
+MainScroll.BackgroundTransparency = 1
+MainScroll.ScrollBarThickness = 4
+MainScroll.ScrollBarImageColor3 = Color3.fromRGB(150, 150, 150)
+MainScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+MainScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+MainScroll.Parent = MainPanel
+
+local MainListLayout = Instance.new("UIListLayout")
+MainListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+MainListLayout.Padding = UDim.new(0, 8)
+MainListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+MainListLayout.Parent = MainScroll
+
+local MainScrollPadding = Instance.new("UIPadding")
+MainScrollPadding.PaddingTop = UDim.new(0, 6)
+MainScrollPadding.Parent = MainScroll
+
+-- 建立按鈕輔助函數
+local function makeMainButton(text, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 260, 0, 42)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = MainScroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+-- 按鈕（由上到下）
+local teleportButton   = makeMainButton("自動海上飛行",  Color3.fromRGB(80, 200, 120))
+local stopButton       = makeMainButton("停止移動",      Color3.fromRGB(200, 80, 80))
+local flyToTikiButton  = makeMainButton("飛到 Tiki 島",  Color3.fromRGB(180, 100, 220))
+local espFruitButton   = makeMainButton("ESP 果實",      Color3.fromRGB(220, 130, 50))
+local speedButton      = makeMainButton("速度設置",      Color3.fromRGB(100, 180, 255))
+local autoBattleButton = makeMainButton("自動戰鬥設置",  Color3.fromRGB(220, 150, 80))
+local espButton        = makeMainButton("ESP 玩家 開啟", Color3.fromRGB(180, 80, 200))
+local infoButton       = makeMainButton("顯示信息",      Color3.fromRGB(80, 120, 200))
 
 -- 創建信息頁面面板
 local InfoPanel = Instance.new("Frame")
@@ -231,95 +288,6 @@ local FastAttackSettings = {
     Distance = 150
 }
 -- ========== 自動戰鬥系統設置結束 ==========
-
--- 在主面板添加飛到Tiki的按钮 (新增按鈕，放在原按鈕下方)
-local flyToTikiButton = Instance.new("TextButton")
-flyToTikiButton.Name = "FlyToTikiButton"
-flyToTikiButton.Size = UDim2.new(0, 150, 0, 40)
-flyToTikiButton.Position = UDim2.new(0, 20, 0, 170)
-flyToTikiButton.BackgroundColor3 = Color3.fromRGB(180, 100, 220)  -- 紫色系
-flyToTikiButton.Text = "飛到Tiki"
-flyToTikiButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyToTikiButton.TextScaled = true
-flyToTikiButton.Parent = MainPanel
-
--- 在主面板添加传送按钮
-local teleportButton = Instance.new("TextButton")
-teleportButton.Name = "TeleportButton"
-teleportButton.Size = UDim2.new(0, 150, 0, 40)
-teleportButton.Position = UDim2.new(0, 20, 0, 20)
-teleportButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-teleportButton.Text = "自動海上飛行(標準位置在司法後面啟飛)"
-teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-teleportButton.TextScaled = true
-teleportButton.Parent = MainPanel
-
--- 在主面板添加停止按钮
-local stopButton = Instance.new("TextButton")
-stopButton.Name = "StopButton"
-stopButton.Size = UDim2.new(0, 150, 0, 40)
-stopButton.Position = UDim2.new(0, 20, 0, 70)
-stopButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-stopButton.Text = "停止移動"
-stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopButton.TextScaled = true
-stopButton.Parent = MainPanel
-
--- 在主面板添加信息页面按钮
-local infoButton = Instance.new("TextButton")
-infoButton.Name = "InfoButton"
-infoButton.Size = UDim2.new(0, 150, 0, 40)
-infoButton.Position = UDim2.new(0, 20, 0, 120)
-infoButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-infoButton.Text = "顯示信息"
-infoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-infoButton.TextScaled = true
-infoButton.Parent = MainPanel
-
--- 在主面板添加自動戰鬥按钮
-local autoBattleButton = Instance.new("TextButton")
-autoBattleButton.Name = "AutoBattleButton"
-autoBattleButton.Size = UDim2.new(0, 150, 0, 40)
-autoBattleButton.Position = UDim2.new(0, 20, 0, 220)
-autoBattleButton.BackgroundColor3 = Color3.fromRGB(220, 150, 80)
-autoBattleButton.Text = "自動戰鬥設置"
-autoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-autoBattleButton.TextScaled = true
-autoBattleButton.Parent = MainPanel
-
-local autoBattleCorner = Instance.new("UICorner")
-autoBattleCorner.CornerRadius = UDim.new(0, 8)
-autoBattleCorner.Parent = autoBattleButton
-
--- 在主面板添加速度设置按钮
-local speedButton = Instance.new("TextButton")
-speedButton.Name = "SpeedButton"
-speedButton.Size = UDim2.new(0, 150, 0, 40)
-speedButton.Position = UDim2.new(0, 160, 0, 220)
-speedButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
-speedButton.Text = "速度设置"
-speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedButton.TextScaled = true
-speedButton.Parent = MainPanel
-
-local speedCorner = Instance.new("UICorner")
-speedCorner.CornerRadius = UDim.new(0, 8)
-speedCorner.Parent = speedButton
-
--- ESP 按鈕（放在自動戰鬥和速度下方）
-local espButton = Instance.new("TextButton")
-espButton.Name = "EspButton"
-espButton.Size = UDim2.new(0, 260, 0, 40)
-espButton.Position = UDim2.new(0, 20, 0, 270)
-espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-espButton.Text = "ESP 開啟"
-espButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-espButton.TextScaled = true
-espButton.Parent = MainPanel
-
-local espCorner = Instance.new("UICorner")
-espCorner.CornerRadius = UDim.new(0, 8)
-espCorner.Parent = espButton
 
 -- 在信息页面添加返回按钮
 local backButton = Instance.new("TextButton")
@@ -545,26 +513,6 @@ speedBackCorner.Parent = speedBackButton
 -- 控制变量
 local isMoving = false
 local moveConnection = nil
-
--- ========== updatePanelStatus 定義（必須在所有按鈕事件之前）==========
-local function updatePanelStatus()
-    if MainPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
-        IconButton.BackgroundTransparency = 0
-    elseif InfoPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
-        IconButton.BackgroundTransparency = 0
-    elseif BattlePanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
-        IconButton.BackgroundTransparency = 0
-    elseif SpeedPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255)
-        IconButton.BackgroundTransparency = 0
-    else
-        IconButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        IconButton.BackgroundTransparency = 0.5
-    end
-end
 
 -- 移动功能
 teleportButton.MouseButton1Click:Connect(function()
@@ -885,20 +833,9 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
 end)
 
 -- ========== 速度控制功能代碼開始 ==========
+local TweenService = game:GetService("TweenService")
 local speedConnection = nil
 local currentSpeedValue = nil
-
-local function applySpeed(val)
-    local char = Player.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-    -- 嘗試用 sethiddenproperty 繞過保護，失敗則用普通賦值
-    local ok = pcall(sethiddenproperty, hum, "WalkSpeed", val)
-    if not ok then
-        pcall(function() hum.WalkSpeed = val end)
-    end
-end
 
 local function startSpeedLoop(val)
     if speedConnection then
@@ -907,11 +844,21 @@ local function startSpeedLoop(val)
     end
     currentSpeedValue = val
     speedConnection = RunService.Heartbeat:Connect(function()
-        applySpeed(currentSpeedValue)
+        local char = Player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+        local moveDir = hum.MoveDirection
+        if moveDir.Magnitude > 0.1 then
+            local distance = currentSpeedValue * 0.05
+            local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
+            local targetCFrame = CFrame.new(hrp.Position + moveDir * distance) * (hrp.CFrame - hrp.Position)
+            TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame}):Play()
+        end
     end)
 end
 
--- 角色重生時自動重新套用
 Player.CharacterAdded:Connect(function()
     if currentSpeedValue then
         task.wait(0.5)
@@ -919,7 +866,6 @@ Player.CharacterAdded:Connect(function()
     end
 end)
 
--- 確認按鈕點擊事件
 confirmSpeedButton.MouseButton1Click:Connect(function()
     local inputVal = tonumber(speedTextBox.Text)
     if not inputVal then
@@ -935,21 +881,194 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- 更新所有面板顯示狀態的函數
--- 圖標點擊事件（修復版，可以關閉所有面板）
+-- ========== updatePanelStatus（在圖標事件之前定義）==========
+local function updatePanelStatus()
+    if MainPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
+        IconButton.BackgroundTransparency = 0
+    elseif InfoPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+        IconButton.BackgroundTransparency = 0
+    elseif BattlePanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+        IconButton.BackgroundTransparency = 0
+    elseif SpeedPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255)
+        IconButton.BackgroundTransparency = 0
+    else
+        IconButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        IconButton.BackgroundTransparency = 0.5
+    end
+end
+
+-- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    -- 如果任何面板是顯示的，則全部關閉
     if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible then
         MainPanel.Visible = false
         InfoPanel.Visible = false
         BattlePanel.Visible = false
         SpeedPanel.Visible = false
     else
-        -- 如果所有面板都是隱藏的，則顯示主面板
         MainPanel.Visible = true
     end
-    updatePanelStatus() -- 更新圖標狀態
+    updatePanelStatus()
 end)
+
+-- ========== ESP 玩家功能 ==========
+local espEnabled = false
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ESPFolder"
+espFolder.Parent = workspace
+
+local function getPlayerLevel(targetPlayer)
+    local ok, level = pcall(function() return targetPlayer.Data.Level.Value end)
+    if ok and level then return tostring(level) end
+    return "?"
+end
+
+local function createESP(targetPlayer)
+    if espFolder:FindFirstChild(targetPlayer.Name) then return end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = targetPlayer.Name
+    billboard.Size = UDim2.new(0, 160, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = espFolder
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = targetPlayer.Name
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.Parent = billboard
+
+    local levelLabel = Instance.new("TextLabel")
+    levelLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    levelLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    levelLabel.BackgroundTransparency = 1
+    levelLabel.TextColor3 = Color3.fromRGB(100, 220, 255)
+    levelLabel.TextScaled = true
+    levelLabel.Font = Enum.Font.Gotham
+    levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
+    levelLabel.TextStrokeTransparency = 0
+    levelLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    levelLabel.Parent = billboard
+
+    local updateConn
+    updateConn = RunService.Heartbeat:Connect(function()
+        if not espEnabled or not targetPlayer or not targetPlayer.Parent then
+            billboard:Destroy()
+            updateConn:Disconnect()
+            return
+        end
+        local char = targetPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then billboard.Adornee = hrp end
+        end
+        levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
+    end)
+end
+
+local function clearAllESP()
+    for _, v in ipairs(espFolder:GetChildren()) do v:Destroy() end
+end
+
+local function buildAllESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player then createESP(p) end
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if espEnabled then createESP(p) end
+end)
+
+espButton.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        espButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        espButton.Text = "ESP 玩家 關閉"
+        buildAllESP()
+    else
+        espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+        espButton.Text = "ESP 玩家 開啟"
+        clearAllESP()
+    end
+end)
+-- ========== ESP 玩家功能結束 ==========
+
+-- ========== ESP 果實功能 ==========
+local espFruitEnabled = false
+local fruitEspFolder = Instance.new("Folder")
+fruitEspFolder.Name = "FruitESPFolder"
+fruitEspFolder.Parent = workspace
+local fruitEspConnection = nil
+
+local function scanFruits()
+    for _, v in ipairs(fruitEspFolder:GetChildren()) do v:Destroy() end
+    local containers = {"Fruits", "DroppedFruits", "MapItems"}
+    for _, containerName in ipairs(containers) do
+        local container = workspace:FindFirstChild(containerName)
+        if container then
+            for _, fruit in ipairs(container:GetChildren()) do
+                local part = fruit:IsA("BasePart") and fruit
+                    or (fruit:IsA("Model") and (fruit.PrimaryPart or fruit:FindFirstChildOfClass("BasePart")))
+                if part then
+                    local bb = Instance.new("BillboardGui")
+                    bb.Name = fruit.Name
+                    bb.Size = UDim2.new(0, 140, 0, 40)
+                    bb.StudsOffset = Vector3.new(0, 4, 0)
+                    bb.AlwaysOnTop = true
+                    bb.Adornee = part
+                    bb.Parent = fruitEspFolder
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(1, 0, 1, 0)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = "🍎 " .. fruit.Name
+                    lbl.TextColor3 = Color3.fromRGB(255, 220, 50)
+                    lbl.TextScaled = true
+                    lbl.Font = Enum.Font.GothamBold
+                    lbl.TextStrokeTransparency = 0
+                    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    lbl.Parent = bb
+                end
+            end
+        end
+    end
+end
+
+espFruitButton.MouseButton1Click:Connect(function()
+    espFruitEnabled = not espFruitEnabled
+    if espFruitEnabled then
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        espFruitButton.Text = "ESP 果實 關閉"
+        scanFruits()
+        fruitEspConnection = task.spawn(function()
+            while espFruitEnabled do
+                task.wait(2)
+                if espFruitEnabled then scanFruits() end
+            end
+        end)
+    else
+        espFruitEnabled = false
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
+        espFruitButton.Text = "ESP 果實"
+        if fruitEspConnection then
+            task.cancel(fruitEspConnection)
+            fruitEspConnection = nil
+        end
+        for _, v in ipairs(fruitEspFolder:GetChildren()) do v:Destroy() end
+    end
+end)
+-- ========== ESP 果實功能結束 ==========
+
+-- 初始更新面板狀態
+updatePanelStatus()
 
 -- ========== 飛到Tiki功能代碼開始 ==========
 -- 飛行控制變量（飛到Tiki）
@@ -1273,21 +1392,4 @@ end)
 
 -- 玩家離開時清除（billboard 的 updateConnection 內部會自動清除）
 
--- ESP 按鈕點擊事件
-espButton.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-
-    if espEnabled then
-        espButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        espButton.Text = "ESP 關閉"
-        buildAllESP()
-    else
-        espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-        espButton.Text = "ESP 開啟"
-        clearAllESP()
-    end
-end)
 -- ========== ESP 功能代碼結束 ==========
-
--- 初始更新面板状态
-updatePanelStatus()
