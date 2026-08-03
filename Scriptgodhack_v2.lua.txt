@@ -265,6 +265,7 @@ local speedButton      = makeMainButton("速度設置",      Color3.fromRGB(100,
 local autoBattleButton = makeMainButton("自動戰鬥設置",  Color3.fromRGB(220, 150, 80))
 local espButton        = makeMainButton("ESP 玩家 開啟", Color3.fromRGB(180, 80, 200))
 local infoButton       = makeMainButton("顯示信息",      Color3.fromRGB(80, 120, 200))
+local flySettingsButton = makeMainButton("飛行設置",      Color3.fromRGB(150, 100, 255))
 
 -- 創建信息頁面面板
 local InfoPanel = Instance.new("Frame")
@@ -510,6 +511,117 @@ local speedBackCorner = Instance.new("UICorner")
 speedBackCorner.CornerRadius = UDim.new(0, 8)
 speedBackCorner.Parent = speedBackButton
 
+-- 新增飛行功能相關的 UI 組件和邏輯
+
+-- 飛行控制變量
+local isFlying = false
+local flySpeed = 50 -- 預設飛行速度
+local flyConnection = nil
+
+-- 創建飛行設置面板
+local FlyPanel = Instance.new("Frame")
+FlyPanel.Name = "FlyPanel"
+FlyPanel.Size = UDim2.new(0, 300, 0, 200)
+FlyPanel.Position = UDim2.new(0, 90, 0, 20)
+FlyPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+FlyPanel.BackgroundTransparency = 0.1
+FlyPanel.Visible = false
+FlyPanel.Parent = ScreenGui
+
+local FlyPanelCorner = Instance.new("UICorner")
+FlyPanelCorner.CornerRadius = UDim.new(0.05, 0)
+FlyPanelCorner.Parent = FlyPanel
+
+-- 飛行面板標題
+local flyTitle = Instance.new("TextLabel")
+flyTitle.Name = "FlyTitle"
+flyTitle.Size = UDim2.new(0, 260, 0, 35)
+flyTitle.Position = UDim2.new(0, 20, 0, 10)
+flyTitle.BackgroundTransparency = 1
+flyTitle.Text = "飛行設置"
+flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTitle.TextScaled = true
+flyTitle.Font = Enum.Font.GothamBold
+flyTitle.Parent = FlyPanel
+
+-- 開啟/關閉飛行按鈕
+local toggleFlyButton = Instance.new("TextButton")
+toggleFlyButton.Name = "ToggleFlyButton"
+toggleFlyButton.Size = UDim2.new(0, 260, 0, 40)
+toggleFlyButton.Position = UDim2.new(0, 20, 0, 55)
+toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80) -- 預設為關閉紅色
+toggleFlyButton.Text = "開啟自由飛行"
+toggleFlyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleFlyButton.TextScaled = true
+toggleFlyButton.Font = Enum.Font.Gotham
+toggleFlyButton.Parent = FlyPanel
+
+local toggleFlyCorner = Instance.new("UICorner")
+toggleFlyCorner.CornerRadius = UDim.new(0, 8)
+toggleFlyCorner.Parent = toggleFlyButton
+
+-- 速度滑動條標籤
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Name = "FlySpeedLabel"
+flySpeedLabel.Size = UDim2.new(0, 260, 0, 20)
+flySpeedLabel.Position = UDim2.new(0, 20, 0, 105)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Text = "飛行速度: " .. flySpeed
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.TextScaled = true
+flySpeedLabel.Font = Enum.Font.Gotham
+flySpeedLabel.Parent = FlyPanel
+
+-- 速度滑動條 (使用 Frame 和 TextButton 模擬)
+local flySpeedSliderFrame = Instance.new("Frame")
+flySpeedSliderFrame.Name = "FlySpeedSliderFrame"
+flySpeedSliderFrame.Size = UDim2.new(0, 260, 0, 10)
+flySpeedSliderFrame.Position = UDim2.new(0, 20, 0, 130)
+flySpeedSliderFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flySpeedSliderFrame.Parent = FlyPanel
+
+local flySpeedSlider = Instance.new("TextButton")
+flySpeedSlider.Name = "FlySpeedSlider"
+flySpeedSlider.Size = UDim2.new(0.5, 0, 1, 0) -- 初始值為 50% (50)
+flySpeedSlider.Position = UDim2.new(0, 0, 0, 0)
+flySpeedSlider.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+flySpeedSlider.Text = ""
+flySpeedSlider.Parent = flySpeedSliderFrame
+
+local flySpeedSliderCorner = Instance.new("UICorner")
+flySpeedSliderCorner.CornerRadius = UDim.new(0, 5)
+flySpeedSliderCorner.Parent = flySpeedSliderFrame
+
+local flySpeedThumb = Instance.new("Frame")
+flySpeedThumb.Name = "FlySpeedThumb"
+flySpeedThumb.Size = UDim2.new(0, 10, 0, 20)
+flySpeedThumb.Position = UDim2.new(0.5, -5, -0.5, 0)
+flySpeedThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedThumb.BorderSizePixel = 0
+flySpeedThumb.Parent = flySpeedSliderFrame
+
+local flySpeedThumbCorner = Instance.new("UICorner")
+flySpeedThumbCorner.CornerRadius = UDim.new(0, 5)
+flySpeedThumbCorner.Parent = flySpeedThumb
+
+-- 飛行面板返回按鈕
+local flyBackButton = Instance.new("TextButton")
+flyBackButton.Name = "FlyBackButton"
+flyBackButton.Size = UDim2.new(0, 150, 0, 40)
+flyBackButton.Position = UDim2.new(0, 20, 0, 155)
+flyBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+flyBackButton.Text = "返回主頁"
+flyBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBackButton.TextScaled = true
+flyBackButton.Font = Enum.Font.Gotham
+flyBackButton.Parent = FlyPanel
+
+local flyBackCorner = Instance.new("UICorner")
+flyBackCorner.CornerRadius = UDim.new(0, 8)
+flyBackCorner.Parent = flyBackButton
+
+
+
 -- 控制变量
 local isMoving = false
 local moveConnection = nil
@@ -580,6 +692,26 @@ infoButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = true
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
+    updatePanelStatus()
+end)
+
+flySettingsButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    FlyPanel.Visible = true
+    updatePanelStatus()
+end)
+
+flyBackButton.MouseButton1Click:Connect(function()
+    FlyPanel.Visible = false
+    MainPanel.Visible = true
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -589,6 +721,7 @@ backButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = true
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -598,6 +731,7 @@ autoBattleButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = false
     BattlePanel.Visible = true
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -607,6 +741,7 @@ battleBackButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = true
     InfoPanel.Visible = false
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -881,6 +1016,127 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
+-- ========== 自由飛行功能代碼開始 ==========
+-- 飛行邏輯
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+local function startFreeFly()
+    if not Player.Character or not Player.Character:FindFirstChildOfClass("Humanoid") or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
+
+    local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+
+    humanoid.PlatformStand = true -- 禁用物理
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+
+    flyConnection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not isFlying or not Player.Character or not hrp or not humanoid then
+            -- 如果飛行被禁用或角色不存在，則斷開連接
+            if flyConnection then flyConnection:Disconnect() end
+            flyConnection = nil
+            return
+        end
+
+        local moveVector = Vector3.new(0, 0, 0)
+        local cameraCFrame = Camera.CFrame
+
+        -- 根據 WASD 鍵獲取移動方向
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveVector = moveVector + cameraCFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveVector = moveVector - cameraCFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveVector = moveVector - cameraCFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveVector = moveVector + cameraCFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.E) then -- 上升
+            moveVector = moveVector + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Q) then -- 下降
+            moveVector = moveVector - Vector3.new(0, 1, 0)
+        end
+
+        if moveVector.Magnitude > 0 then
+            local normalizedMove = moveVector.Unit
+            hrp.CFrame = hrp.CFrame + normalizedMove * flySpeed * deltaTime
+        end
+    end)
+end
+
+local function stopFreeFly()
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    if Player.Character and Player.Character:FindFirstChildOfClass("Humanoid") then
+        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+        humanoid.PlatformStand = false -- 恢復物理
+        humanoid.WalkSpeed = 16 -- 恢復預設速度
+        humanoid.JumpPower = 50 -- 恢復預設跳躍力
+    end
+end
+
+-- 飛行按鈕點擊事件
+toggleFlyButton.MouseButton1Click:Connect(function()
+    isFlying = not isFlying
+    if isFlying then
+        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120) -- 開啟綠色
+        toggleFlyButton.Text = "關閉自由飛行"
+        startFreeFly()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自由飛行",
+            Text = "自由飛行已開啟",
+            Duration = 3
+        })
+    else
+        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80) -- 關閉紅色
+        toggleFlyButton.Text = "開啟自由飛行"
+        stopFreeFly()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自由飛行",
+            Text = "自由飛行已關閉",
+            Duration = 3
+        })
+    end
+end)
+
+-- 速度滑動條控制邏輯
+local isDraggingSlider = false
+flySpeedSlider.MouseButton1Down:Connect(function()
+    isDraggingSlider = true
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessedEvent)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDraggingSlider = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input, gameProcessedEvent)
+    if isDraggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local mouseX = input.Position.X
+        local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
+        local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
+
+        local relativeX = math.clamp(mouseX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
+        local percentage = relativeX / sliderFrameAbsoluteSizeX
+
+        flySpeed = math.floor(percentage * 200) + 10 -- 速度範圍 10-210
+        flySpeedLabel.Text = "飛行速度: " .. flySpeed
+        flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
+        flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
+    end
+end)
+
+
+-- ========== 自由飛行功能代碼結束 ==========
+
 -- ========== updatePanelStatus（在圖標事件之前定義）==========
 local function updatePanelStatus()
     if MainPanel.Visible then
@@ -891,6 +1147,9 @@ local function updatePanelStatus()
         IconButton.BackgroundTransparency = 0
     elseif BattlePanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+        IconButton.BackgroundTransparency = 0
+        elseif FlyPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(150, 100, 255)
         IconButton.BackgroundTransparency = 0
     elseif SpeedPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255)
@@ -903,11 +1162,12 @@ end
 
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible then
+    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible then
         MainPanel.Visible = false
         InfoPanel.Visible = false
         BattlePanel.Visible = false
         SpeedPanel.Visible = false
+        FlyPanel.Visible = false
     else
         MainPanel.Visible = true
     end
