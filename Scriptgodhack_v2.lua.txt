@@ -515,7 +515,7 @@ speedBackCorner.Parent = speedBackButton
 
 -- 飛行控制變量
 local isFlying = false
-local flySpeed = 50 -- 預設飛行速度
+local flySpeed = 50 -- 預設飛行速度 (最高400)
 local flyConnection = nil
 
 -- 創建飛行設置面板
@@ -582,7 +582,7 @@ flySpeedSliderFrame.Parent = FlyPanel
 
 local flySpeedSlider = Instance.new("TextButton")
 flySpeedSlider.Name = "FlySpeedSlider"
-flySpeedSlider.Size = UDim2.new(0.5, 0, 1, 0) -- 初始值為 50% (50)
+flySpeedSlider.Size = UDim2.new(0.125, 0, 1, 0) -- 初始值為 50% (50)
 flySpeedSlider.Position = UDim2.new(0, 0, 0, 0)
 flySpeedSlider.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 flySpeedSlider.Text = ""
@@ -595,7 +595,7 @@ flySpeedSliderCorner.Parent = flySpeedSliderFrame
 local flySpeedThumb = Instance.new("Frame")
 flySpeedThumb.Name = "FlySpeedThumb"
 flySpeedThumb.Size = UDim2.new(0, 10, 0, 20)
-flySpeedThumb.Position = UDim2.new(0.5, -5, -0.5, 0)
+flySpeedThumb.Position = UDim2.new(0.125, -5, -0.5, 0)
 flySpeedThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 flySpeedThumb.BorderSizePixel = 0
 flySpeedThumb.Parent = flySpeedSliderFrame
@@ -1001,7 +1001,7 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始 (手機端優化版) ==========
+-- ========== 自由飛行功能代碼開始 (全視角連動 + 400速度版) ==========
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 
@@ -1015,7 +1015,7 @@ local function setupMobileUI()
         local upBtn = Instance.new("TextButton")
         upBtn.Name = "UpButton"
         upBtn.Size = UDim2.new(0, 60, 0, 60)
-        upBtn.Position = UDim2.new(1, 10, 0, 0) -- 放在面板右側
+        upBtn.Position = UDim2.new(1, 10, 0, 0)
         upBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
         upBtn.Text = "上"
         upBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1023,18 +1023,15 @@ local function setupMobileUI()
         upBtn.Parent = FlyPanel
         Instance.new("UICorner", upBtn).CornerRadius = UDim.new(0.5, 0)
         
-        upBtn.MouseButton1Down:Connect(function() flyUp = true end)
-        upBtn.MouseButton1Up:Connect(function() flyUp = false end)
-        -- 支援觸控
-        upBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then flyUp = true end end)
-        upBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then flyUp = false end end)
+        upBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = true end end)
+        upBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = false end end)
     end
 
     if not FlyPanel:FindFirstChild("DownButton") then
         local downBtn = Instance.new("TextButton")
         downBtn.Name = "DownButton"
         downBtn.Size = UDim2.new(0, 60, 0, 60)
-        downBtn.Position = UDim2.new(1, 10, 0, 70) -- 放在上升按鈕下面
+        downBtn.Position = UDim2.new(1, 10, 0, 70)
         downBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         downBtn.Text = "下"
         downBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1042,11 +1039,8 @@ local function setupMobileUI()
         downBtn.Parent = FlyPanel
         Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0.5, 0)
         
-        downBtn.MouseButton1Down:Connect(function() flyDown = true end)
-        downBtn.MouseButton1Up:Connect(function() flyDown = false end)
-        -- 支援觸控
-        downBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then flyDown = true end end)
-        downBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then flyDown = false end end)
+        downBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = true end end)
+        downBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = false end end)
     end
 end
 
@@ -1056,7 +1050,6 @@ local function startFreeFly()
     local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
     local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
 
-    -- 清除舊組件
     if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
     if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
 
@@ -1084,23 +1077,34 @@ local function startFreeFly()
         end
 
         local cameraCFrame = Camera.CFrame
-        local moveDir = humanoid.MoveDirection -- 獲取手機搖桿方向
+        local moveDir = humanoid.MoveDirection 
         
-        -- 旋轉：面向相機
+        -- 旋轉：完全跟隨相機視角
         bg.CFrame = cameraCFrame
 
-        -- 速度計算
-        local velocity = moveDir * flySpeed
+        -- 全視角連動飛行邏輯
+        local finalVelocity = Vector3.new(0, 0, 0)
         
-        -- 垂直移動控制
-        local verticalSpeed = 0
-        if flyUp then verticalSpeed = flySpeed end
-        if flyDown then verticalSpeed = -flySpeed end
+        if moveDir.Magnitude > 0 then
+            -- 獲取搖桿在水平面上的方向
+            -- 由於 MoveDirection 已經是相對於相機的水平方向，我們需要將其轉換為相對於相機 CFrame 的 3D 方向
+            -- 簡單來說：推搖桿「前」，就往 Camera.LookVector 飛
+            
+            -- 我們利用 Camera 的坐標系來轉換 MoveDirection
+            -- 這樣手機玩家推搖桿前，就會朝著鏡頭中心點飛（包含上下）
+            local direction = (cameraCFrame.LookVector * moveDir.Z) + (cameraCFrame.RightVector * moveDir.X)
+            if direction.Magnitude > 0 then
+                finalVelocity = direction.Unit * flySpeed
+            end
+        end
         
-        -- 最終速度 (水平搖桿方向 + 垂直按鈕方向)
-        bv.Velocity = Vector3.new(velocity.X, verticalSpeed, velocity.Z)
+        -- 垂直按鈕輔助（保留作為微調）
+        if flyUp then finalVelocity = finalVelocity + Vector3.new(0, flySpeed, 0) end
+        if flyDown then finalVelocity = finalVelocity - Vector3.new(0, flySpeed, 0) end
         
-        -- 如果完全沒有移動輸入，給予極小的向上力防止下沉
+        bv.Velocity = finalVelocity
+        
+        -- 防止掉落
         if bv.Velocity.Magnitude == 0 then
             bv.Velocity = Vector3.new(0, 0.1, 0)
         end
@@ -1134,24 +1138,31 @@ toggleFlyButton.MouseButton1Click:Connect(function()
         toggleFlyButton.Text = "關閉自由飛行"
         startFreeFly()
         game.StarterGui:SetCore("SendNotification", {
-            Title = "自由飛行",
-            Text = "手機端模式已開啟\n使用搖桿移動，按鈕升降",
+            Title = "全視角飛行已開啟",
+            Text = "推動搖桿即朝視角方向飛行\n最高速度: 400",
             Duration = 3
         })
     else
         toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         toggleFlyButton.Text = "開啟自由飛行"
         stopFreeFly()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "自由飛行",
-            Text = "自由飛行已關閉",
-            Duration = 3
-        })
     end
 end)
 
--- 速度滑動條控制邏輯 (保持不變，但確保適用於觸控)
+-- 速度滑動條控制邏輯 (更新上限為 400)
 local isDraggingSlider = false
+local function updateSlider(inputX)
+    local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
+    local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
+    local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
+    local percentage = relativeX / sliderFrameAbsoluteSizeX
+
+    flySpeed = math.floor(percentage * 390) + 10 -- 10 到 400
+    flySpeedLabel.Text = "飛行速度: " .. flySpeed
+    flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
+    flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
+end
+
 flySpeedSlider.MouseButton1Down:Connect(function() isDraggingSlider = true end)
 flySpeedSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true end end)
 
@@ -1163,17 +1174,7 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local inputX = input.Position.X
-        local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
-        local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
-
-        local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
-        local percentage = relativeX / sliderFrameAbsoluteSizeX
-
-        flySpeed = math.floor(percentage * 200) + 10
-        flySpeedLabel.Text = "飛行速度: " .. flySpeed
-        flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
-        flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
+        updateSlider(input.Position.X)
     end
 end)
 
@@ -1193,6 +1194,7 @@ flyBackButton.MouseButton1Click:Connect(function()
     updatePanelStatus()
 end)
 -- ========== 自由飛行功能代碼結束 ==========
+
 
 
 
