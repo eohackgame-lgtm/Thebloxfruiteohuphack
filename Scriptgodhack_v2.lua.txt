@@ -1001,48 +1001,15 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始 (全視角連動 + 400速度版) ==========
+-- ========== 自由飛行功能代碼開始 (跨平台 3D 視角連動版) ==========
 local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 
--- 飛行控制變量
-local flyUp = false
-local flyDown = false
-
--- 獲取或創建上升按鈕 (UI 部分)
-local function setupMobileUI()
-    if not FlyPanel:FindFirstChild("UpButton") then
-        local upBtn = Instance.new("TextButton")
-        upBtn.Name = "UpButton"
-        upBtn.Size = UDim2.new(0, 60, 0, 60)
-        upBtn.Position = UDim2.new(1, 10, 0, 0)
-        upBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        upBtn.Text = "上"
-        upBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        upBtn.TextScaled = true
-        upBtn.Parent = FlyPanel
-        Instance.new("UICorner", upBtn).CornerRadius = UDim.new(0.5, 0)
-        
-        upBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = true end end)
-        upBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyUp = false end end)
-    end
-
-    if not FlyPanel:FindFirstChild("DownButton") then
-        local downBtn = Instance.new("TextButton")
-        downBtn.Name = "DownButton"
-        downBtn.Size = UDim2.new(0, 60, 0, 60)
-        downBtn.Position = UDim2.new(1, 10, 0, 70)
-        downBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        downBtn.Text = "下"
-        downBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        downBtn.TextScaled = true
-        downBtn.Parent = FlyPanel
-        Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0.5, 0)
-        
-        downBtn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = true end end)
-        downBtn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then flyDown = false end end)
-    end
-end
+-- 獲取 Roblox 控制模組以支援手機搖桿和電腦鍵盤的原始輸入
+local ControlModule = nil
+pcall(function()
+    ControlModule = require(Player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
+end)
 
 local function startFreeFly()
     if not Player.Character or not Player.Character:FindFirstChildOfClass("Humanoid") or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
@@ -1050,6 +1017,7 @@ local function startFreeFly()
     local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
     local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
 
+    -- 清除舊組件
     if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
     if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
 
@@ -1067,7 +1035,6 @@ local function startFreeFly()
     bg.Parent = hrp
 
     humanoid.PlatformStand = true
-    setupMobileUI()
 
     flyConnection = RunService.Heartbeat:Connect(function()
         if not isFlying or not Player.Character or not hrp or not humanoid then
@@ -1077,35 +1044,26 @@ local function startFreeFly()
         end
 
         local cameraCFrame = Camera.CFrame
-        local moveDir = humanoid.MoveDirection 
         
-        -- 旋轉：完全跟隨相機視角
-        bg.CFrame = cameraCFrame
-
-        -- 全視角連動飛行邏輯
-        local finalVelocity = Vector3.new(0, 0, 0)
-        
-        if moveDir.Magnitude > 0 then
-            -- 獲取搖桿在水平面上的方向
-            -- 由於 MoveDirection 已經是相對於相機的水平方向，我們需要將其轉換為相對於相機 CFrame 的 3D 方向
-            -- 簡單來說：推搖桿「前」，就往 Camera.LookVector 飛
-            
-            -- 我們利用 Camera 的坐標系來轉換 MoveDirection
-            -- 這樣手機玩家推搖桿前，就會朝著鏡頭中心點飛（包含上下）
-            local direction = (cameraCFrame.LookVector * moveDir.Z) + (cameraCFrame.RightVector * moveDir.X)
-            if direction.Magnitude > 0 then
-                finalVelocity = direction.Unit * flySpeed
-            end
+        -- 獲取原始移動向量 (X: 左右, Z: 前後, Y: 跳躍/上升)
+        -- 在 Roblox 控制中，Z = -1 是前進，Z = 1 是後退
+        local moveVector = Vector3.new(0,0,0)
+        if ControlModule then
+            moveVector = ControlModule:GetMoveVector()
         end
         
-        -- 垂直按鈕輔助（保留作為微調）
-        if flyUp then finalVelocity = finalVelocity + Vector3.new(0, flySpeed, 0) end
-        if flyDown then finalVelocity = finalVelocity - Vector3.new(0, flySpeed, 0) end
+        -- 旋轉：始終面向相機方向
+        bg.CFrame = cameraCFrame
+
+        -- 計算 3D 飛行方向
+        -- 前後移動使用 Camera.LookVector (Z 是反向的，所以用 -moveVector.Z)
+        -- 左右移動使用 Camera.RightVector
+        local direction = (cameraCFrame.LookVector * -moveVector.Z) + (cameraCFrame.RightVector * moveVector.X)
         
-        bv.Velocity = finalVelocity
-        
-        -- 防止掉落
-        if bv.Velocity.Magnitude == 0 then
+        if direction.Magnitude > 0 then
+            bv.Velocity = direction.Unit * flySpeed
+        else
+            -- 沒有輸入時保持靜止懸浮，給予極小向上力防止物理引擎下沉
             bv.Velocity = Vector3.new(0, 0.1, 0)
         end
     end)
@@ -1138,8 +1096,8 @@ toggleFlyButton.MouseButton1Click:Connect(function()
         toggleFlyButton.Text = "關閉自由飛行"
         startFreeFly()
         game.StarterGui:SetCore("SendNotification", {
-            Title = "全視角飛行已開啟",
-            Text = "推動搖桿即朝視角方向飛行\n最高速度: 400",
+            Title = "3D 飛行已開啟",
+            Text = "推動搖桿/WASD 即朝視角方向飛行\n支援手機與電腦",
             Duration = 3
         })
     else
@@ -1149,7 +1107,7 @@ toggleFlyButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- 速度滑動條控制邏輯 (更新上限為 400)
+-- 速度滑動條控制邏輯 (上限 400)
 local isDraggingSlider = false
 local function updateSlider(inputX)
     local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
@@ -1194,6 +1152,7 @@ flyBackButton.MouseButton1Click:Connect(function()
     updatePanelStatus()
 end)
 -- ========== 自由飛行功能代碼結束 ==========
+
 
 
 
