@@ -262,7 +262,7 @@ local stopButton       = makeMainButton("停止移動",      Color3.fromRGB(200,
 local flyToTikiButton  = makeMainButton("飛到 Tiki 島",  Color3.fromRGB(180, 100, 220))
 local espFruitButton   = makeMainButton("ESP 果實",      Color3.fromRGB(220, 130, 50))
 local speedButton      = makeMainButton("速度設置",      Color3.fromRGB(100, 180, 255))
-local autoBattleButton = makeMainButton("自動戰鬥設置",  Color3.fromRGB(220, 150, 80))
+local autoBattleButton = makeMainButton("自動攻擊設置",  Color3.fromRGB(220, 150, 80))
 local espButton        = makeMainButton("ESP 玩家 開啟", Color3.fromRGB(180, 80, 200))
 local infoButton       = makeMainButton("顯示信息",      Color3.fromRGB(80, 120, 200))
 local flySettingsButton = makeMainButton("飛行設置",      Color3.fromRGB(150, 100, 255))
@@ -401,7 +401,7 @@ toggleAutoBattleButton.Name = "ToggleAutoBattleButton"
 toggleAutoBattleButton.Size = UDim2.new(0, 260, 0, 40)
 toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 151)
 toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-toggleAutoBattleButton.Text = "關閉自動戰鬥"
+toggleAutoBattleButton.Text = "關閉自動攻擊"
 toggleAutoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleAutoBattleButton.TextScaled = true
 toggleAutoBattleButton.Parent = BattlePanel
@@ -928,7 +928,7 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
     
     if FastAttackSettings.AutoClick then
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        toggleAutoBattleButton.Text = "開啟自動戰鬥"
+        toggleAutoBattleButton.Text = "開啟自動攻擊"
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Start()
         end
@@ -940,7 +940,7 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
         })
     else
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        toggleAutoBattleButton.Text = "關閉自動戰鬥"
+        toggleAutoBattleButton.Text = "關閉自動攻擊"
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Stop()
         end
