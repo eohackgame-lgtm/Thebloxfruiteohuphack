@@ -1153,6 +1153,89 @@ flyBackButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 自由飛行功能代碼結束 ==========
 
+-- ========== ESP 果實功能強化版 ==========
+local espFruitEnabled = false
+local fruitEspConnection = nil
+
+local function createFruitEsp(v)
+    if not v:FindFirstChild("FruitESP") then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "FruitESP"
+        billboard.AlwaysOnTop = true
+        billboard.Size = UDim2.new(0, 100, 0, 50)
+        billboard.Adornee = v
+        
+        local lbl = Instance.new("TextLabel")
+        lbl.Parent = billboard
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.Text = "🍎 " .. v.Name
+        lbl.TextColor3 = Color3.fromRGB(255, 50, 50)
+        lbl.TextStrokeTransparency = 0
+        lbl.TextScaled = true
+        lbl.Font = Enum.Font.GothamBold
+        
+        billboard.Parent = v
+    end
+end
+
+local function updateFruitEsp()
+    for _, v in pairs(workspace:GetChildren()) do
+        -- 偵測所有 Tool (果實通常是 Tool) 或者名字包含 Fruit 的物體
+        if v:IsA("Tool") or (v:IsA("Model") and string.find(v.Name:lower(), "fruit")) then
+            -- 排除玩家背著的果實
+            if not v:FindFirstChildOfClass("Humanoid") and not v.Parent:FindFirstChildOfClass("Humanoid") then
+                createFruitEsp(v)
+            end
+        end
+    end
+end
+
+espFruitButton.MouseButton1Click:Connect(function()
+    espFruitEnabled = not espFruitEnabled
+    if espFruitEnabled then
+        espFruitButton.Text = "ESP 果實 開啟"
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        
+        -- 立即執行一次
+        updateFruitEsp()
+        
+        -- 開啟持續偵測
+        fruitEspConnection = RunService.Heartbeat:Connect(function()
+            updateFruitEsp()
+        end)
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "ESP 果實",
+            Text = "果實透視已開啟",
+            Duration = 3
+        })
+    else
+        espFruitButton.Text = "ESP 果實 關閉"
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
+        
+        if fruitEspConnection then
+            fruitEspConnection:Disconnect()
+            fruitEspConnection = nil
+        end
+        
+        -- 清除所有標籤
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v.Name == "FruitESP" then
+                v:Destroy()
+            end
+        end
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "ESP 果實",
+            Text = "果實透視已關閉",
+            Duration = 3
+        })
+    end
+end)
+-- ========== ESP 果實功能結束 ==========
+
+
 
 
 
@@ -1283,7 +1366,7 @@ end)
 -- ========== ESP 玩家功能結束 ==========
 
 -- ========== ESP 果實功能 ==========
-local espFruitEnabled = false
+
 local fruitEspFolder = Instance.new("Folder")
 fruitEspFolder.Name = "FruitESPFolder"
 fruitEspFolder.Parent = workspace
@@ -1322,29 +1405,7 @@ local function scanFruits()
     end
 end
 
-espFruitButton.MouseButton1Click:Connect(function()
-    espFruitEnabled = not espFruitEnabled
-    if espFruitEnabled then
-        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        espFruitButton.Text = "ESP 果實 關閉"
-        scanFruits()
-        fruitEspConnection = task.spawn(function()
-            while espFruitEnabled do
-                task.wait(2)
-                if espFruitEnabled then scanFruits() end
-            end
-        end)
-    else
-        espFruitEnabled = false
-        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
-        espFruitButton.Text = "ESP 果實"
-        if fruitEspConnection then
-            task.cancel(fruitEspConnection)
-            fruitEspConnection = nil
-        end
-        for _, v in ipairs(fruitEspFolder:GetChildren()) do v:Destroy() end
-    end
-end)
+
 -- ========== ESP 果實功能結束 ==========
 
 -- 初始更新面板狀態
