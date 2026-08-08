@@ -526,6 +526,7 @@ FlyPanel.Position = UDim2.new(0, 90, 0, 20)
 FlyPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 FlyPanel.BackgroundTransparency = 0.1
 FlyPanel.Visible = false
+        AimbotPanel.Visible = false
 FlyPanel.Parent = ScreenGui
 
 local FlyPanelCorner = Instance.new("UICorner")
@@ -693,6 +694,7 @@ infoButton.MouseButton1Click:Connect(function()
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
     FlyPanel.Visible = false
+        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -707,6 +709,7 @@ backButton.MouseButton1Click:Connect(function()
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
     FlyPanel.Visible = false
+        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -717,6 +720,7 @@ autoBattleButton.MouseButton1Click:Connect(function()
     BattlePanel.Visible = true
     SpeedPanel.Visible = false
     FlyPanel.Visible = false
+        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -727,6 +731,7 @@ battleBackButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = false
     SpeedPanel.Visible = false
     FlyPanel.Visible = false
+        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -1148,6 +1153,7 @@ end)
 
 flyBackButton.MouseButton1Click:Connect(function()
     FlyPanel.Visible = false
+        AimbotPanel.Visible = false
     MainPanel.Visible = true
     updatePanelStatus()
 end)
@@ -1265,17 +1271,196 @@ end
 
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible then
+    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible or AimbotPanel.Visible then
         MainPanel.Visible = false
         InfoPanel.Visible = false
         BattlePanel.Visible = false
         SpeedPanel.Visible = false
         FlyPanel.Visible = false
+        AimbotPanel.Visible = false
     else
         MainPanel.Visible = true
     end
     updatePanelStatus()
 end)
+
+
+
+-- ========== 自動瞄準 (Aimbot) 功能開始 ==========
+local AimbotSettings = {
+    Enabled = false,
+    Mode = "Nearest", -- "Nearest" 或 "Target"
+    TargetName = "",
+    Smoothing = 0.5 -- 瞄準平滑度
+}
+
+local aimbotConnection = nil
+local Camera = workspace.CurrentCamera
+
+-- 創建瞄準設置面板
+local AimbotPanel = Instance.new("Frame")
+AimbotPanel.Name = "AimbotPanel"
+AimbotPanel.Size = UDim2.new(0, 300, 0, 320)
+AimbotPanel.Position = UDim2.new(0, 90, 0, 20)
+AimbotPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+AimbotPanel.BackgroundTransparency = 0.1
+AimbotPanel.Visible = false
+AimbotPanel.Parent = ScreenGui
+
+local AimbotPanelCorner = Instance.new("UICorner")
+AimbotPanelCorner.CornerRadius = UDim.new(0.05, 0)
+AimbotPanelCorner.Parent = AimbotPanel
+
+-- 標題
+local aimbotTitle = Instance.new("TextLabel")
+aimbotTitle.Size = UDim2.new(0, 260, 0, 35)
+aimbotTitle.Position = UDim2.new(0, 20, 0, 10)
+aimbotTitle.BackgroundTransparency = 1
+aimbotTitle.Text = "自動瞄準設置"
+aimbotTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotTitle.TextScaled = true
+aimbotTitle.Font = Enum.Font.GothamBold
+aimbotTitle.Parent = AimbotPanel
+
+-- 開啟/關閉按鈕
+local toggleAimbotButton = Instance.new("TextButton")
+toggleAimbotButton.Size = UDim2.new(0, 260, 0, 40)
+toggleAimbotButton.Position = UDim2.new(0, 20, 0, 55)
+toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+toggleAimbotButton.Text = "自動瞄準: 關閉"
+toggleAimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleAimbotButton.TextScaled = true
+toggleAimbotButton.Parent = AimbotPanel
+Instance.new("UICorner", toggleAimbotButton).CornerRadius = UDim.new(0, 8)
+
+-- 切換模式按鈕
+local toggleModeButton = Instance.new("TextButton")
+toggleModeButton.Size = UDim2.new(0, 260, 0, 40)
+toggleModeButton.Position = UDim2.new(0, 20, 0, 105)
+toggleModeButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
+toggleModeButton.Text = "模式: 瞄準最近玩家"
+toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleModeButton.TextScaled = true
+toggleModeButton.Parent = AimbotPanel
+Instance.new("UICorner", toggleModeButton).CornerRadius = UDim.new(0, 8)
+
+-- 指定玩家輸入框
+local targetInput = Instance.new("TextBox")
+targetInput.Size = UDim2.new(0, 260, 0, 40)
+targetInput.Position = UDim2.new(0, 20, 0, 155)
+targetInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+targetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetInput.PlaceholderText = "輸入目標玩家真名..."
+targetInput.Text = ""
+targetInput.TextScaled = true
+targetInput.Parent = AimbotPanel
+Instance.new("UICorner", targetInput).CornerRadius = UDim.new(0, 8)
+
+-- 返回按鈕
+local aimbotBackButton = Instance.new("TextButton")
+aimbotBackButton.Size = UDim2.new(0, 260, 0, 40)
+aimbotBackButton.Position = UDim2.new(0, 20, 0, 260)
+aimbotBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+aimbotBackButton.Text = "返回主頁"
+aimbotBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotBackButton.TextScaled = true
+aimbotBackButton.Parent = AimbotPanel
+Instance.new("UICorner", aimbotBackButton).CornerRadius = UDim.new(0, 8)
+
+-- 獲取最近玩家的函數
+local function getNearestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local distance = (v.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                closestPlayer = v
+                shortestDistance = distance
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- 獲取指定名稱玩家的函數
+local function getTargetPlayer(name)
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if v.Name:lower() == name:lower() and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            return v
+        end
+    end
+    return nil
+end
+
+-- 核心瞄準循環
+local function startAimbot()
+    if aimbotConnection then aimbotConnection:Disconnect() end
+    
+    aimbotConnection = RunService.RenderStepped:Connect(function()
+        if not AimbotSettings.Enabled or not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
+        
+        local target = nil
+        if AimbotSettings.Mode == "Nearest" then
+            target = getNearestPlayer()
+        else
+            target = getTargetPlayer(AimbotSettings.TargetName)
+        end
+        
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = target.Character.HumanoidRootPart.Position
+            -- 瞄準頭部或軀幹
+            local lookAt = CFrame.new(Camera.CFrame.Position, targetPos)
+            -- 使用 CFrame.lerp 實現平滑轉向
+            Camera.CFrame = Camera.CFrame:lerp(lookAt, AimbotSettings.Smoothing)
+        end
+    end)
+end
+
+-- UI 事件連結
+toggleAimbotButton.MouseButton1Click:Connect(function()
+    AimbotSettings.Enabled = not AimbotSettings.Enabled
+    if AimbotSettings.Enabled then
+        toggleAimbotButton.Text = "自動瞄準: 開啟"
+        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        startAimbot()
+    else
+        toggleAimbotButton.Text = "自動瞄準: 關閉"
+        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        if aimbotConnection then aimbotConnection:Disconnect() end
+    end
+end)
+
+toggleModeButton.MouseButton1Click:Connect(function()
+    if AimbotSettings.Mode == "Nearest" then
+        AimbotSettings.Mode = "Target"
+        toggleModeButton.Text = "模式: 瞄準指定玩家"
+    else
+        AimbotSettings.Mode = "Nearest"
+        toggleModeButton.Text = "模式: 瞄準最近玩家"
+    end
+end)
+
+targetInput.FocusLost:Connect(function()
+    AimbotSettings.TargetName = targetInput.Text
+end)
+
+aimbotBackButton.MouseButton1Click:Connect(function()
+    AimbotPanel.Visible = false
+    MainPanel.Visible = true
+    updatePanelStatus()
+end)
+
+-- 在主選單中添加按鈕導航
+local aimbotNavButton = makeMainButton("自動瞄準設置", Color3.fromRGB(255, 80, 150))
+aimbotNavButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    AimbotPanel.Visible = true
+    updatePanelStatus()
+end)
+-- ========== 自動瞄準 (Aimbot) 功能結束 ==========
+
 
 -- ========== ESP 玩家功能 ==========
 local espEnabled = false
