@@ -13,8 +13,6 @@ if not Player then
 end
 
 local PlayerGui = Player:WaitForChild("PlayerGui")
-local FlyPanel = nil
-local updatePanelStatus
 
 -- 顯示通知（加載時自動顯示）
 game.StarterGui:SetCore("SendNotification", {
@@ -361,7 +359,7 @@ battleTitle.Name = "BattleTitle"
 battleTitle.Size = UDim2.new(0, 260, 0, 35)
 battleTitle.Position = UDim2.new(0, 20, 0, 10)
 battleTitle.BackgroundTransparency = 1
-battleTitle.Text = "自動攻擊設置"
+battleTitle.Text = "自動戰鬥設置"
 battleTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 battleTitle.TextScaled = true
 battleTitle.Font = Enum.Font.GothamBold
@@ -403,7 +401,7 @@ toggleAutoBattleButton.Name = "ToggleAutoBattleButton"
 toggleAutoBattleButton.Size = UDim2.new(0, 260, 0, 40)
 toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 151)
 toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-toggleAutoBattleButton.Text = "自動攻擊：關閉"
+toggleAutoBattleButton.Text = "關閉自動攻擊"
 toggleAutoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleAutoBattleButton.TextScaled = true
 toggleAutoBattleButton.Parent = BattlePanel
@@ -513,6 +511,117 @@ local speedBackCorner = Instance.new("UICorner")
 speedBackCorner.CornerRadius = UDim.new(0, 8)
 speedBackCorner.Parent = speedBackButton
 
+-- 新增飛行功能相關的 UI 組件和邏輯
+
+-- 飛行控制變量
+local isFlying = false
+local flySpeed = 50 -- 預設飛行速度 (最高400)
+local flyConnection = nil
+
+-- 創建飛行設置面板
+local FlyPanel = Instance.new("Frame")
+FlyPanel.Name = "FlyPanel"
+FlyPanel.Size = UDim2.new(0, 300, 0, 200)
+FlyPanel.Position = UDim2.new(0, 90, 0, 20)
+FlyPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+FlyPanel.BackgroundTransparency = 0.1
+FlyPanel.Visible = false
+FlyPanel.Parent = ScreenGui
+
+local FlyPanelCorner = Instance.new("UICorner")
+FlyPanelCorner.CornerRadius = UDim.new(0.05, 0)
+FlyPanelCorner.Parent = FlyPanel
+
+-- 飛行面板標題
+local flyTitle = Instance.new("TextLabel")
+flyTitle.Name = "FlyTitle"
+flyTitle.Size = UDim2.new(0, 260, 0, 35)
+flyTitle.Position = UDim2.new(0, 20, 0, 10)
+flyTitle.BackgroundTransparency = 1
+flyTitle.Text = "飛行設置"
+flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTitle.TextScaled = true
+flyTitle.Font = Enum.Font.GothamBold
+flyTitle.Parent = FlyPanel
+
+-- 開啟/關閉飛行按鈕
+local toggleFlyButton = Instance.new("TextButton")
+toggleFlyButton.Name = "ToggleFlyButton"
+toggleFlyButton.Size = UDim2.new(0, 260, 0, 40)
+toggleFlyButton.Position = UDim2.new(0, 20, 0, 55)
+toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80) -- 預設為關閉紅色
+toggleFlyButton.Text = "開啟自由飛行"
+toggleFlyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleFlyButton.TextScaled = true
+toggleFlyButton.Font = Enum.Font.Gotham
+toggleFlyButton.Parent = FlyPanel
+
+local toggleFlyCorner = Instance.new("UICorner")
+toggleFlyCorner.CornerRadius = UDim.new(0, 8)
+toggleFlyCorner.Parent = toggleFlyButton
+
+-- 速度滑動條標籤
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Name = "FlySpeedLabel"
+flySpeedLabel.Size = UDim2.new(0, 260, 0, 20)
+flySpeedLabel.Position = UDim2.new(0, 20, 0, 105)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Text = "飛行速度: " .. flySpeed
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.TextScaled = true
+flySpeedLabel.Font = Enum.Font.Gotham
+flySpeedLabel.Parent = FlyPanel
+
+-- 速度滑動條 (使用 Frame 和 TextButton 模擬)
+local flySpeedSliderFrame = Instance.new("Frame")
+flySpeedSliderFrame.Name = "FlySpeedSliderFrame"
+flySpeedSliderFrame.Size = UDim2.new(0, 260, 0, 10)
+flySpeedSliderFrame.Position = UDim2.new(0, 20, 0, 130)
+flySpeedSliderFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flySpeedSliderFrame.Parent = FlyPanel
+
+local flySpeedSlider = Instance.new("TextButton")
+flySpeedSlider.Name = "FlySpeedSlider"
+flySpeedSlider.Size = UDim2.new(0.125, 0, 1, 0) -- 初始值為 50% (50)
+flySpeedSlider.Position = UDim2.new(0, 0, 0, 0)
+flySpeedSlider.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+flySpeedSlider.Text = ""
+flySpeedSlider.Parent = flySpeedSliderFrame
+
+local flySpeedSliderCorner = Instance.new("UICorner")
+flySpeedSliderCorner.CornerRadius = UDim.new(0, 5)
+flySpeedSliderCorner.Parent = flySpeedSliderFrame
+
+local flySpeedThumb = Instance.new("Frame")
+flySpeedThumb.Name = "FlySpeedThumb"
+flySpeedThumb.Size = UDim2.new(0, 10, 0, 20)
+flySpeedThumb.Position = UDim2.new(0.125, -5, -0.5, 0)
+flySpeedThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedThumb.BorderSizePixel = 0
+flySpeedThumb.Parent = flySpeedSliderFrame
+
+local flySpeedThumbCorner = Instance.new("UICorner")
+flySpeedThumbCorner.CornerRadius = UDim.new(0, 5)
+flySpeedThumbCorner.Parent = flySpeedThumb
+
+-- 飛行面板返回按鈕
+local flyBackButton = Instance.new("TextButton")
+flyBackButton.Name = "FlyBackButton"
+flyBackButton.Size = UDim2.new(0, 150, 0, 40)
+flyBackButton.Position = UDim2.new(0, 20, 0, 155)
+flyBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+flyBackButton.Text = "返回主頁"
+flyBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBackButton.TextScaled = true
+flyBackButton.Font = Enum.Font.Gotham
+flyBackButton.Parent = FlyPanel
+
+local flyBackCorner = Instance.new("UICorner")
+flyBackCorner.CornerRadius = UDim.new(0, 8)
+flyBackCorner.Parent = flyBackButton
+
+
+
 -- 控制变量
 local isMoving = false
 local moveConnection = nil
@@ -583,8 +692,13 @@ infoButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = true
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
+
+
+
+
 
 -- 返回按钮功能
 backButton.MouseButton1Click:Connect(function()
@@ -592,6 +706,7 @@ backButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = true
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -601,6 +716,7 @@ autoBattleButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = false
     BattlePanel.Visible = true
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -610,6 +726,7 @@ battleBackButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = true
     InfoPanel.Visible = false
     SpeedPanel.Visible = false
+    FlyPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -692,10 +809,6 @@ FastAttackModule.FastAttack = (function()
     function FastAttack:Attack(BasePart, OthersEnemies)
         if not BasePart or #OthersEnemies == 0 then return end
         if RegisterAttack and RegisterHit then
-            pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-            end)
             RegisterAttack:FireServer(FastAttackSettings.ClickDelay or 0)
             RegisterHit:FireServer(BasePart, OthersEnemies)
         end
@@ -815,25 +928,25 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
     
     if FastAttackSettings.AutoClick then
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        toggleAutoBattleButton.Text = "自動攻擊：開啟"
+        toggleAutoBattleButton.Text = "開啟自動攻擊"
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Start()
         end
         setupAutoTeam()
         game.StarterGui:SetCore("SendNotification", {
-            Title = "自動攻擊",
-            Text = "自動攻擊已開啟",
+            Title = "自動戰鬥",
+            Text = "自動戰鬥已開啟",
             Duration = 3
         })
     else
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        toggleAutoBattleButton.Text = "自動攻擊：關閉"
+        toggleAutoBattleButton.Text = "關閉自動攻擊"
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Stop()
         end
         game.StarterGui:SetCore("SendNotification", {
-            Title = "自動攻擊",
-            Text = "自動攻擊已關閉",
+            Title = "自動戰鬥",
+            Text = "自動戰鬥已關閉",
             Duration = 3
         })
     end
@@ -888,8 +1001,247 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
+-- ========== 自由飛行功能代碼開始 (跨平台 3D 視角連動版) ==========
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+-- 獲取 Roblox 控制模組以支援手機搖桿和電腦鍵盤的原始輸入
+local ControlModule = nil
+pcall(function()
+    ControlModule = require(Player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
+end)
+
+local function startFreeFly()
+    if not Player.Character or not Player.Character:FindFirstChildOfClass("Humanoid") or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
+
+    local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+
+    -- 清除舊組件
+    if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+    if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "FlyVelocity"
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = hrp
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "FlyGyro"
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P = 9e4
+    bg.CFrame = hrp.CFrame
+    bg.Parent = hrp
+
+    humanoid.PlatformStand = true
+
+    flyConnection = RunService.Heartbeat:Connect(function()
+        if not isFlying or not Player.Character or not hrp or not humanoid then
+            if flyConnection then flyConnection:Disconnect() end
+            flyConnection = nil
+            return
+        end
+
+        local cameraCFrame = Camera.CFrame
+        
+        -- 獲取原始移動向量 (X: 左右, Z: 前後, Y: 跳躍/上升)
+        -- 在 Roblox 控制中，Z = -1 是前進，Z = 1 是後退
+        local moveVector = Vector3.new(0,0,0)
+        if ControlModule then
+            moveVector = ControlModule:GetMoveVector()
+        end
+        
+        -- 旋轉：始終面向相機方向
+        bg.CFrame = cameraCFrame
+
+        -- 計算 3D 飛行方向
+        -- 前後移動使用 Camera.LookVector (Z 是反向的，所以用 -moveVector.Z)
+        -- 左右移動使用 Camera.RightVector
+        local direction = (cameraCFrame.LookVector * -moveVector.Z) + (cameraCFrame.RightVector * moveVector.X)
+        
+        if direction.Magnitude > 0 then
+            bv.Velocity = direction.Unit * flySpeed
+        else
+            -- 沒有輸入時保持靜止懸浮，給予極小向上力防止物理引擎下沉
+            bv.Velocity = Vector3.new(0, 0.1, 0)
+        end
+    end)
+end
+
+local function stopFreeFly()
+    isFlying = false
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    if Player.Character then
+        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+        if hrp then
+            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+            if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+        end
+        if humanoid then
+            humanoid.PlatformStand = false
+        end
+    end
+end
+
+-- 飛行按鈕點擊事件
+toggleFlyButton.MouseButton1Click:Connect(function()
+    isFlying = not isFlying
+    if isFlying then
+        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        toggleFlyButton.Text = "關閉自由飛行"
+        startFreeFly()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "3D 飛行已開啟",
+            Text = "推動搖桿/WASD 即朝視角方向飛行\n支援手機與電腦",
+            Duration = 3
+        })
+    else
+        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        toggleFlyButton.Text = "開啟自由飛行"
+        stopFreeFly()
+    end
+end)
+
+-- 速度滑動條控制邏輯 (上限 400)
+local isDraggingSlider = false
+local function updateSlider(inputX)
+    local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
+    local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
+    local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
+    local percentage = relativeX / sliderFrameAbsoluteSizeX
+
+    flySpeed = math.floor(percentage * 390) + 10 -- 10 到 400
+    flySpeedLabel.Text = "飛行速度: " .. flySpeed
+    flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
+    flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
+end
+
+flySpeedSlider.MouseButton1Down:Connect(function() isDraggingSlider = true end)
+flySpeedSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true end end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSlider = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateSlider(input.Position.X)
+    end
+end)
+
+-- 面板切換
+flySettingsButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    FlyPanel.Visible = true
+    updatePanelStatus()
+end)
+
+flyBackButton.MouseButton1Click:Connect(function()
+    FlyPanel.Visible = false
+    MainPanel.Visible = true
+    updatePanelStatus()
+end)
+-- ========== 自由飛行功能代碼結束 ==========
+
+-- ========== ESP 果實功能強化版 ==========
+local espFruitEnabled = false
+local fruitEspConnection = nil
+
+local function createFruitEsp(v)
+    if not v:FindFirstChild("FruitESP") then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "FruitESP"
+        billboard.AlwaysOnTop = true
+        billboard.Size = UDim2.new(0, 100, 0, 50)
+        billboard.Adornee = v
+        
+        local lbl = Instance.new("TextLabel")
+        lbl.Parent = billboard
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.Text = "🍎 " .. v.Name
+        lbl.TextColor3 = Color3.fromRGB(255, 50, 50)
+        lbl.TextStrokeTransparency = 0
+        lbl.TextScaled = true
+        lbl.Font = Enum.Font.GothamBold
+        
+        billboard.Parent = v
+    end
+end
+
+local function updateFruitEsp()
+    for _, v in pairs(workspace:GetChildren()) do
+        -- 偵測所有 Tool (果實通常是 Tool) 或者名字包含 Fruit 的物體
+        if v:IsA("Tool") or (v:IsA("Model") and string.find(v.Name:lower(), "fruit")) then
+            -- 排除玩家背著的果實
+            if not v:FindFirstChildOfClass("Humanoid") and not v.Parent:FindFirstChildOfClass("Humanoid") then
+                createFruitEsp(v)
+            end
+        end
+    end
+end
+
+espFruitButton.MouseButton1Click:Connect(function()
+    espFruitEnabled = not espFruitEnabled
+    if espFruitEnabled then
+        espFruitButton.Text = "ESP 果實 開啟"
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        
+        -- 立即執行一次
+        updateFruitEsp()
+        
+        -- 開啟持續偵測
+        fruitEspConnection = RunService.Heartbeat:Connect(function()
+            updateFruitEsp()
+        end)
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "ESP 果實",
+            Text = "果實透視已開啟",
+            Duration = 3
+        })
+    else
+        espFruitButton.Text = "ESP 果實 關閉"
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
+        
+        if fruitEspConnection then
+            fruitEspConnection:Disconnect()
+            fruitEspConnection = nil
+        end
+        
+        -- 清除所有標籤
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v.Name == "FruitESP" then
+                v:Destroy()
+            end
+        end
+        
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "ESP 果實",
+            Text = "果實透視已關閉",
+            Duration = 3
+        })
+    end
+end)
+-- ========== ESP 果實功能結束 ==========
+
+
+
+
+
+
 -- ========== updatePanelStatus（在圖標事件之前定義）==========
-updatePanelStatus = function()
+local function updatePanelStatus()
     if MainPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
         IconButton.BackgroundTransparency = 0
@@ -898,6 +1250,9 @@ updatePanelStatus = function()
         IconButton.BackgroundTransparency = 0
     elseif BattlePanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
+        IconButton.BackgroundTransparency = 0
+        elseif FlyPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(150, 100, 255)
         IconButton.BackgroundTransparency = 0
     elseif SpeedPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255)
@@ -910,13 +1265,12 @@ end
 
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    local panels = {MainPanel, InfoPanel, BattlePanel, SpeedPanel, FlyPanel}
-    local anyVisible = false
-    for _, panel in ipairs(panels) do
-        if panel and panel.Visible then anyVisible = true break end
-    end
-    if anyVisible then
-        for _, panel in ipairs(panels) do if panel then panel.Visible = false end end
+    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible then
+        MainPanel.Visible = false
+        InfoPanel.Visible = false
+        BattlePanel.Visible = false
+        SpeedPanel.Visible = false
+        FlyPanel.Visible = false
     else
         MainPanel.Visible = true
     end
@@ -1011,95 +1365,47 @@ espButton.MouseButton1Click:Connect(function()
 end)
 -- ========== ESP 玩家功能結束 ==========
 
--- ========== ESP 果實功能（強化版） ==========
-local espFruitEnabled = false
+-- ========== ESP 果實功能 ==========
+
 local fruitEspFolder = Instance.new("Folder")
 fruitEspFolder.Name = "FruitESPFolder"
 fruitEspFolder.Parent = workspace
 local fruitEspConnection = nil
-local fruitScanClock = 0
 
-local function belongsToCharacterOrBackpack(item)
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        local character = targetPlayer.Character
-        local backpack = targetPlayer:FindFirstChildOfClass("Backpack")
-        if (character and item:IsDescendantOf(character)) or (backpack and item:IsDescendantOf(backpack)) then return true end
-    end
-    local parent = item.Parent
-    while parent and parent ~= workspace do
-        if parent:FindFirstChildOfClass("Humanoid") then return true end
-        parent = parent.Parent
-    end
-    return false
-end
-
-local function getFruitPart(item)
-    if item:IsA("Tool") then
-        return item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart", true)
-    elseif item:IsA("Model") then
-        return item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
-    elseif item:IsA("BasePart") then
-        return item
-    end
-    return nil
-end
-
-local function clearFruitESP()
-    for _, child in ipairs(fruitEspFolder:GetChildren()) do child:Destroy() end
-end
-
-local function refreshFruitESP()
-    clearFruitESP()
-    for _, item in ipairs(workspace:GetDescendants()) do
-        local isFruitCandidate = item:IsA("Tool") or (item:IsA("Model") and item.Name:lower():find("fruit") ~= nil)
-        if isFruitCandidate and not belongsToCharacterOrBackpack(item) then
-            local part = getFruitPart(item)
-            if part then
-                local tag = Instance.new("BillboardGui")
-                tag.Name = "FruitESP"
-                tag.Adornee = part
-                tag.Size = UDim2.new(0, 180, 0, 45)
-                tag.StudsOffset = Vector3.new(0, 3.5, 0)
-                tag.AlwaysOnTop = true
-                tag.Parent = fruitEspFolder
-
-                local label = Instance.new("TextLabel")
-                label.Size = UDim2.new(1, 0, 1, 0)
-                label.BackgroundTransparency = 1
-                label.Text = "🍎 " .. item.Name
-                label.TextColor3 = Color3.fromRGB(255, 220, 50)
-                label.TextStrokeTransparency = 0
-                label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                label.Font = Enum.Font.GothamBold
-                label.TextScaled = true
-                label.Parent = tag
+local function scanFruits()
+    for _, v in ipairs(fruitEspFolder:GetChildren()) do v:Destroy() end
+    local containers = {"Fruits", "DroppedFruits", "MapItems"}
+    for _, containerName in ipairs(containers) do
+        local container = workspace:FindFirstChild(containerName)
+        if container then
+            for _, fruit in ipairs(container:GetChildren()) do
+                local part = fruit:IsA("BasePart") and fruit
+                    or (fruit:IsA("Model") and (fruit.PrimaryPart or fruit:FindFirstChildOfClass("BasePart")))
+                if part then
+                    local bb = Instance.new("BillboardGui")
+                    bb.Name = fruit.Name
+                    bb.Size = UDim2.new(0, 140, 0, 40)
+                    bb.StudsOffset = Vector3.new(0, 4, 0)
+                    bb.AlwaysOnTop = true
+                    bb.Adornee = part
+                    bb.Parent = fruitEspFolder
+                    local lbl = Instance.new("TextLabel")
+                    lbl.Size = UDim2.new(1, 0, 1, 0)
+                    lbl.BackgroundTransparency = 1
+                    lbl.Text = "🍎 " .. fruit.Name
+                    lbl.TextColor3 = Color3.fromRGB(255, 220, 50)
+                    lbl.TextScaled = true
+                    lbl.Font = Enum.Font.GothamBold
+                    lbl.TextStrokeTransparency = 0
+                    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                    lbl.Parent = bb
+                end
             end
         end
     end
 end
 
-espFruitButton.Text = "ESP 果實：關閉"
-espFruitButton.MouseButton1Click:Connect(function()
-    espFruitEnabled = not espFruitEnabled
-    if espFruitEnabled then
-        espFruitButton.Text = "ESP 果實：開啟"
-        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        refreshFruitESP()
-        fruitScanClock = 0
-        fruitEspConnection = RunService.Heartbeat:Connect(function(deltaTime)
-            fruitScanClock = fruitScanClock + deltaTime
-            if fruitScanClock >= 0.75 then
-                fruitScanClock = 0
-                refreshFruitESP()
-            end
-        end)
-    else
-        espFruitButton.Text = "ESP 果實：關閉"
-        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
-        if fruitEspConnection then fruitEspConnection:Disconnect(); fruitEspConnection = nil end
-        clearFruitESP()
-    end
-end)
+
 -- ========== ESP 果實功能結束 ==========
 
 -- 初始更新面板狀態
@@ -1428,172 +1734,3 @@ end)
 -- 玩家離開時清除（billboard 的 updateConnection 內部會自動清除）
 
 -- ========== ESP 功能代碼結束 ==========
-
--- ========== 自由飛行（400 速／視角連動） ==========
-local UserInputService = game:GetService("UserInputService")
-local FlySettings = {Enabled = false, Speed = 50, Minimum = 10, Maximum = 400}
-local flyConnection = nil
-local sliderDragging = false
-local controls = nil
-pcall(function()
-    controls = require(Player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
-end)
-
-FlyPanel = Instance.new("Frame")
-FlyPanel.Name = "FlyPanel"
-FlyPanel.Size = UDim2.new(0, 300, 0, 250)
-FlyPanel.Position = UDim2.new(0, 90, 0, 20)
-FlyPanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-FlyPanel.BackgroundTransparency = 0.1
-FlyPanel.Visible = false
-FlyPanel.Parent = ScreenGui
-Instance.new("UICorner", FlyPanel).CornerRadius = UDim.new(0, 12)
-
-local flyTitle = Instance.new("TextLabel")
-flyTitle.Size = UDim2.new(0, 260, 0, 35)
-flyTitle.Position = UDim2.new(0, 20, 0, 10)
-flyTitle.BackgroundTransparency = 1
-flyTitle.Text = "飛行設置"
-flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyTitle.TextScaled = true
-flyTitle.Font = Enum.Font.GothamBold
-flyTitle.Parent = FlyPanel
-
-local flyToggleButton = Instance.new("TextButton")
-flyToggleButton.Size = UDim2.new(0, 260, 0, 42)
-flyToggleButton.Position = UDim2.new(0, 20, 0, 55)
-flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-flyToggleButton.Text = "開啟自由飛行"
-flyToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyToggleButton.TextScaled = true
-flyToggleButton.Parent = FlyPanel
-Instance.new("UICorner", flyToggleButton).CornerRadius = UDim.new(0, 8)
-
-local flySpeedLabel = Instance.new("TextLabel")
-flySpeedLabel.Size = UDim2.new(0, 260, 0, 28)
-flySpeedLabel.Position = UDim2.new(0, 20, 0, 105)
-flySpeedLabel.BackgroundTransparency = 1
-flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-flySpeedLabel.Font = Enum.Font.Gotham
-flySpeedLabel.TextScaled = true
-flySpeedLabel.Parent = FlyPanel
-
-local speedTrack = Instance.new("TextButton")
-speedTrack.Size = UDim2.new(0, 260, 0, 18)
-speedTrack.Position = UDim2.new(0, 20, 0, 140)
-speedTrack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-speedTrack.Text = ""
-speedTrack.AutoButtonColor = false
-speedTrack.Parent = FlyPanel
-Instance.new("UICorner", speedTrack).CornerRadius = UDim.new(0, 9)
-
-local speedFill = Instance.new("Frame")
-speedFill.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-speedFill.BorderSizePixel = 0
-speedFill.Parent = speedTrack
-Instance.new("UICorner", speedFill).CornerRadius = UDim.new(0, 9)
-
-local flyBackButton = Instance.new("TextButton")
-flyBackButton.Size = UDim2.new(0, 260, 0, 40)
-flyBackButton.Position = UDim2.new(0, 20, 0, 185)
-flyBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
-flyBackButton.Text = "返回主頁"
-flyBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyBackButton.TextScaled = true
-flyBackButton.Parent = FlyPanel
-Instance.new("UICorner", flyBackButton).CornerRadius = UDim.new(0, 8)
-
-local function setFlySpeed(x)
-    local width = math.max(speedTrack.AbsoluteSize.X, 1)
-    local alpha = math.clamp((x - speedTrack.AbsolutePosition.X) / width, 0, 1)
-    FlySettings.Speed = math.floor(FlySettings.Minimum + (FlySettings.Maximum - FlySettings.Minimum) * alpha + 0.5)
-    speedFill.Size = UDim2.new(alpha, 0, 1, 0)
-    flySpeedLabel.Text = "飛行速度：" .. tostring(FlySettings.Speed) .. " / 400"
-end
-
-local function refreshFlySpeedLabel()
-    local alpha = (FlySettings.Speed - FlySettings.Minimum) / (FlySettings.Maximum - FlySettings.Minimum)
-    speedFill.Size = UDim2.new(alpha, 0, 1, 0)
-    flySpeedLabel.Text = "飛行速度：" .. tostring(FlySettings.Speed) .. " / 400"
-end
-refreshFlySpeedLabel()
-
-speedTrack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        sliderDragging = true
-        setFlySpeed(input.Position.X)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then setFlySpeed(input.Position.X) end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliderDragging = false end
-end)
-
-local function stopFreeFly()
-    FlySettings.Enabled = false
-    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
-    local character = Player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if root then root.Anchored = false end
-    if humanoid then humanoid.AutoRotate = true end
-    flyToggleButton.Text = "開啟自由飛行"
-    flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-end
-
-local function startFreeFly()
-    local character = Player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not root or not humanoid then return end
-    FlySettings.Enabled = true
-    root.Anchored = true
-    humanoid.AutoRotate = false
-    flyToggleButton.Text = "關閉自由飛行"
-    flyToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-    if flyConnection then flyConnection:Disconnect() end
-    flyConnection = RunService.RenderStepped:Connect(function(deltaTime)
-        local currentCharacter = Player.Character
-        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
-        if not FlySettings.Enabled or not currentRoot then stopFreeFly(); return end
-        local movement = Vector3.new(0, 0, 0)
-        if controls then pcall(function() movement = controls:GetMoveVector() end) end
-        if movement.Magnitude < 0.01 then
-            local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
-            if currentHumanoid then movement = currentHumanoid.MoveDirection end
-        end
-        local camera = workspace.CurrentCamera
-        if camera and movement.Magnitude > 0.01 then
-            local direction = camera.CFrame.LookVector * (-movement.Z) + camera.CFrame.RightVector * movement.X
-            if direction.Magnitude > 0.01 then
-                local nextPosition = currentRoot.Position + direction.Unit * FlySettings.Speed * deltaTime
-                local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
-                currentRoot.CFrame = flatLook.Magnitude > 0.01 and CFrame.new(nextPosition, nextPosition + flatLook.Unit) or CFrame.new(nextPosition)
-            end
-        end
-    end)
-end
-
-flyToggleButton.MouseButton1Click:Connect(function()
-    if FlySettings.Enabled then stopFreeFly() else startFreeFly() end
-end)
-flySettingsButton.MouseButton1Click:Connect(function()
-    MainPanel.Visible = false
-    InfoPanel.Visible = false
-    BattlePanel.Visible = false
-    SpeedPanel.Visible = false
-    FlyPanel.Visible = true
-    updatePanelStatus()
-end)
-flyBackButton.MouseButton1Click:Connect(function()
-    FlyPanel.Visible = false
-    MainPanel.Visible = true
-    updatePanelStatus()
-end)
-Player.CharacterAdded:Connect(function()
-    if FlySettings.Enabled then task.wait(0.5); startFreeFly() end
-end)
--- ========== 自由飛行功能結束 ==========
-
