@@ -14,6 +14,59 @@ end
 
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
+-- ========== 自動瞄準核心邏輯 ==========
+local AimbotSettings = {Enabled = false, Mode = "Nearest", TargetName = "", Smoothing = 0.35, Range = 1500}
+local aimbotConnection = nil
+local FlyPanel = nil
+local updatePanelStatus
+
+local function getNearestAimbotTarget()
+    local character = Player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local selected, distance = nil, AimbotSettings.Range
+    for _, candidate in ipairs(Players:GetPlayers()) do
+        local targetCharacter = candidate.Character
+        local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+        local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
+        if candidate ~= Player and targetRoot and targetHumanoid and targetHumanoid.Health > 0 then
+            local currentDistance = (targetRoot.Position - root.Position).Magnitude
+            if currentDistance < distance then selected, distance = candidate, currentDistance end
+        end
+    end
+    return selected
+end
+
+local function getNamedAimbotTarget(userName)
+    if userName == "" then return nil end
+    for _, candidate in ipairs(Players:GetPlayers()) do
+        local targetCharacter = candidate.Character
+        local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+        local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
+        if candidate.Name:lower() == userName:lower() and targetRoot and targetHumanoid and targetHumanoid.Health > 0 then return candidate end
+    end
+    return nil
+end
+
+local function stopAimbot()
+    AimbotSettings.Enabled = false
+    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+end
+
+local function startAimbot()
+    if aimbotConnection then aimbotConnection:Disconnect() end
+    aimbotConnection = RunService.RenderStepped:Connect(function()
+        if not AimbotSettings.Enabled then return end
+        local target = (AimbotSettings.Mode == "Nearest") and getNearestAimbotTarget() or getNamedAimbotTarget(AimbotSettings.TargetName)
+        local camera = workspace.CurrentCamera
+        local root = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+        if camera and root then
+            camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, root.Position), AimbotSettings.Smoothing)
+        end
+    end)
+end
+
+
 -- 顯示通知（加載時自動顯示）
 game.StarterGui:SetCore("SendNotification", {
     Title = "eoHub",
@@ -342,7 +395,7 @@ infoTextCorner.Parent = infoText
 -- 創建自動戰鬥面板
 local BattlePanel = Instance.new("Frame")
 BattlePanel.Name = "BattlePanel"
-BattlePanel.Size = UDim2.new(0, 300, 0, 285)
+BattlePanel.Size = UDim2.new(0, 300, 0, 420)
 BattlePanel.Position = UDim2.new(0, 90, 0, 20)
 BattlePanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 BattlePanel.BackgroundTransparency = 0.1
@@ -359,7 +412,7 @@ battleTitle.Name = "BattleTitle"
 battleTitle.Size = UDim2.new(0, 260, 0, 35)
 battleTitle.Position = UDim2.new(0, 20, 0, 10)
 battleTitle.BackgroundTransparency = 1
-battleTitle.Text = "自動戰鬥設置"
+battleTitle.Text = "自動攻擊設置"
 battleTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 battleTitle.TextScaled = true
 battleTitle.Font = Enum.Font.GothamBold
@@ -401,7 +454,7 @@ toggleAutoBattleButton.Name = "ToggleAutoBattleButton"
 toggleAutoBattleButton.Size = UDim2.new(0, 260, 0, 40)
 toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 151)
 toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-toggleAutoBattleButton.Text = "關閉自動攻擊"
+toggleAutoBattleButton.Text = "自動攻擊：關閉"
 toggleAutoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleAutoBattleButton.TextScaled = true
 toggleAutoBattleButton.Parent = BattlePanel
@@ -410,11 +463,71 @@ local toggleAutoBattleCorner = Instance.new("UICorner")
 toggleAutoBattleCorner.CornerRadius = UDim.new(0, 8)
 toggleAutoBattleCorner.Parent = toggleAutoBattleButton
 
+-- 自動瞄準控制：放在自動攻擊頁面內。
+local toggleAimbotButton = Instance.new("TextButton")
+toggleAimbotButton.Size = UDim2.new(0, 260, 0, 40)
+toggleAimbotButton.Position = UDim2.new(0, 20, 0, 200)
+toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+toggleAimbotButton.Text = "自動瞄準：關閉"
+toggleAimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleAimbotButton.TextScaled = true
+toggleAimbotButton.Parent = BattlePanel
+Instance.new("UICorner", toggleAimbotButton).CornerRadius = UDim.new(0, 8)
+
+local aimbotModeButton = Instance.new("TextButton")
+aimbotModeButton.Size = UDim2.new(0, 260, 0, 40)
+aimbotModeButton.Position = UDim2.new(0, 20, 0, 250)
+aimbotModeButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
+aimbotModeButton.Text = "模式：瞄準附近玩家"
+aimbotModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotModeButton.TextScaled = true
+aimbotModeButton.Parent = BattlePanel
+Instance.new("UICorner", aimbotModeButton).CornerRadius = UDim.new(0, 8)
+
+local aimbotNameInput = Instance.new("TextBox")
+aimbotNameInput.Size = UDim2.new(0, 260, 0, 40)
+aimbotNameInput.Position = UDim2.new(0, 20, 0, 300)
+aimbotNameInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+aimbotNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotNameInput.PlaceholderText = "輸入玩家使用者名稱（真名）"
+aimbotNameInput.Text = ""
+aimbotNameInput.TextScaled = true
+aimbotNameInput.ClearTextOnFocus = false
+aimbotNameInput.Parent = BattlePanel
+Instance.new("UICorner", aimbotNameInput).CornerRadius = UDim.new(0, 8)
+
+toggleAimbotButton.MouseButton1Click:Connect(function()
+    if AimbotSettings.Enabled then
+        stopAimbot()
+        toggleAimbotButton.Text = "自動瞄準：關閉"
+        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+    else
+        AimbotSettings.Enabled = true
+        startAimbot()
+        toggleAimbotButton.Text = "自動瞄準：開啟"
+        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+    end
+end)
+
+aimbotModeButton.MouseButton1Click:Connect(function()
+    if AimbotSettings.Mode == "Nearest" then
+        AimbotSettings.Mode = "Target"
+        aimbotModeButton.Text = "模式：瞄準指定玩家"
+    else
+        AimbotSettings.Mode = "Nearest"
+        aimbotModeButton.Text = "模式：瞄準附近玩家"
+    end
+end)
+
+aimbotNameInput.FocusLost:Connect(function()
+    AimbotSettings.TargetName = aimbotNameInput.Text
+end)
+
 -- 返回按鈕
 local battleBackButton = Instance.new("TextButton")
 battleBackButton.Name = "BattleBackButton"
 battleBackButton.Size = UDim2.new(0, 260, 0, 40)
-battleBackButton.Position = UDim2.new(0, 20, 0, 230)
+battleBackButton.Position = UDim2.new(0, 20, 0, 370)
 battleBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
 battleBackButton.Text = "返回主頁"
 battleBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -511,118 +624,6 @@ local speedBackCorner = Instance.new("UICorner")
 speedBackCorner.CornerRadius = UDim.new(0, 8)
 speedBackCorner.Parent = speedBackButton
 
--- 新增飛行功能相關的 UI 組件和邏輯
-
--- 飛行控制變量
-local isFlying = false
-local flySpeed = 50 -- 預設飛行速度 (最高400)
-local flyConnection = nil
-
--- 創建飛行設置面板
-local FlyPanel = Instance.new("Frame")
-FlyPanel.Name = "FlyPanel"
-FlyPanel.Size = UDim2.new(0, 300, 0, 200)
-FlyPanel.Position = UDim2.new(0, 90, 0, 20)
-FlyPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
-FlyPanel.BackgroundTransparency = 0.1
-FlyPanel.Visible = false
-        AimbotPanel.Visible = false
-FlyPanel.Parent = ScreenGui
-
-local FlyPanelCorner = Instance.new("UICorner")
-FlyPanelCorner.CornerRadius = UDim.new(0.05, 0)
-FlyPanelCorner.Parent = FlyPanel
-
--- 飛行面板標題
-local flyTitle = Instance.new("TextLabel")
-flyTitle.Name = "FlyTitle"
-flyTitle.Size = UDim2.new(0, 260, 0, 35)
-flyTitle.Position = UDim2.new(0, 20, 0, 10)
-flyTitle.BackgroundTransparency = 1
-flyTitle.Text = "飛行設置"
-flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyTitle.TextScaled = true
-flyTitle.Font = Enum.Font.GothamBold
-flyTitle.Parent = FlyPanel
-
--- 開啟/關閉飛行按鈕
-local toggleFlyButton = Instance.new("TextButton")
-toggleFlyButton.Name = "ToggleFlyButton"
-toggleFlyButton.Size = UDim2.new(0, 260, 0, 40)
-toggleFlyButton.Position = UDim2.new(0, 20, 0, 55)
-toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80) -- 預設為關閉紅色
-toggleFlyButton.Text = "開啟自由飛行"
-toggleFlyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleFlyButton.TextScaled = true
-toggleFlyButton.Font = Enum.Font.Gotham
-toggleFlyButton.Parent = FlyPanel
-
-local toggleFlyCorner = Instance.new("UICorner")
-toggleFlyCorner.CornerRadius = UDim.new(0, 8)
-toggleFlyCorner.Parent = toggleFlyButton
-
--- 速度滑動條標籤
-local flySpeedLabel = Instance.new("TextLabel")
-flySpeedLabel.Name = "FlySpeedLabel"
-flySpeedLabel.Size = UDim2.new(0, 260, 0, 20)
-flySpeedLabel.Position = UDim2.new(0, 20, 0, 105)
-flySpeedLabel.BackgroundTransparency = 1
-flySpeedLabel.Text = "飛行速度: " .. flySpeed
-flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-flySpeedLabel.TextScaled = true
-flySpeedLabel.Font = Enum.Font.Gotham
-flySpeedLabel.Parent = FlyPanel
-
--- 速度滑動條 (使用 Frame 和 TextButton 模擬)
-local flySpeedSliderFrame = Instance.new("Frame")
-flySpeedSliderFrame.Name = "FlySpeedSliderFrame"
-flySpeedSliderFrame.Size = UDim2.new(0, 260, 0, 10)
-flySpeedSliderFrame.Position = UDim2.new(0, 20, 0, 130)
-flySpeedSliderFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-flySpeedSliderFrame.Parent = FlyPanel
-
-local flySpeedSlider = Instance.new("TextButton")
-flySpeedSlider.Name = "FlySpeedSlider"
-flySpeedSlider.Size = UDim2.new(0.125, 0, 1, 0) -- 初始值為 50% (50)
-flySpeedSlider.Position = UDim2.new(0, 0, 0, 0)
-flySpeedSlider.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-flySpeedSlider.Text = ""
-flySpeedSlider.Parent = flySpeedSliderFrame
-
-local flySpeedSliderCorner = Instance.new("UICorner")
-flySpeedSliderCorner.CornerRadius = UDim.new(0, 5)
-flySpeedSliderCorner.Parent = flySpeedSliderFrame
-
-local flySpeedThumb = Instance.new("Frame")
-flySpeedThumb.Name = "FlySpeedThumb"
-flySpeedThumb.Size = UDim2.new(0, 10, 0, 20)
-flySpeedThumb.Position = UDim2.new(0.125, -5, -0.5, 0)
-flySpeedThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-flySpeedThumb.BorderSizePixel = 0
-flySpeedThumb.Parent = flySpeedSliderFrame
-
-local flySpeedThumbCorner = Instance.new("UICorner")
-flySpeedThumbCorner.CornerRadius = UDim.new(0, 5)
-flySpeedThumbCorner.Parent = flySpeedThumb
-
--- 飛行面板返回按鈕
-local flyBackButton = Instance.new("TextButton")
-flyBackButton.Name = "FlyBackButton"
-flyBackButton.Size = UDim2.new(0, 150, 0, 40)
-flyBackButton.Position = UDim2.new(0, 20, 0, 155)
-flyBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
-flyBackButton.Text = "返回主頁"
-flyBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyBackButton.TextScaled = true
-flyBackButton.Font = Enum.Font.Gotham
-flyBackButton.Parent = FlyPanel
-
-local flyBackCorner = Instance.new("UICorner")
-flyBackCorner.CornerRadius = UDim.new(0, 8)
-flyBackCorner.Parent = flyBackButton
-
-
-
 -- 控制变量
 local isMoving = false
 local moveConnection = nil
@@ -693,14 +694,8 @@ infoButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = true
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
-    FlyPanel.Visible = false
-        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
-
-
-
-
 
 -- 返回按钮功能
 backButton.MouseButton1Click:Connect(function()
@@ -708,8 +703,6 @@ backButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = true
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
-    FlyPanel.Visible = false
-        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -719,8 +712,6 @@ autoBattleButton.MouseButton1Click:Connect(function()
     InfoPanel.Visible = false
     BattlePanel.Visible = true
     SpeedPanel.Visible = false
-    FlyPanel.Visible = false
-        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -730,8 +721,6 @@ battleBackButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = true
     InfoPanel.Visible = false
     SpeedPanel.Visible = false
-    FlyPanel.Visible = false
-        AimbotPanel.Visible = false
     updatePanelStatus()
 end)
 
@@ -814,6 +803,10 @@ FastAttackModule.FastAttack = (function()
     function FastAttack:Attack(BasePart, OthersEnemies)
         if not BasePart or #OthersEnemies == 0 then return end
         if RegisterAttack and RegisterHit then
+            pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+            end)
             RegisterAttack:FireServer(FastAttackSettings.ClickDelay or 0)
             RegisterHit:FireServer(BasePart, OthersEnemies)
         end
@@ -933,25 +926,25 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
     
     if FastAttackSettings.AutoClick then
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        toggleAutoBattleButton.Text = "開啟自動攻擊"
+        toggleAutoBattleButton.Text = "自動攻擊：開啟"
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Start()
         end
         setupAutoTeam()
         game.StarterGui:SetCore("SendNotification", {
-            Title = "自動戰鬥",
-            Text = "自動戰鬥已開啟",
+            Title = "自動攻擊",
+            Text = "自動攻擊已開啟",
             Duration = 3
         })
     else
         toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        toggleAutoBattleButton.Text = "關閉自動攻擊"
+        toggleAutoBattleButton.Text = "自動攻擊：關閉"
         if FastAttackModule.FastAttack then
             FastAttackModule.FastAttack:Stop()
         end
         game.StarterGui:SetCore("SendNotification", {
-            Title = "自動戰鬥",
-            Text = "自動戰鬥已關閉",
+            Title = "自動攻擊",
+            Text = "自動攻擊已關閉",
             Duration = 3
         })
     end
@@ -1006,248 +999,8 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始 (跨平台 3D 視角連動版) ==========
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-
--- 獲取 Roblox 控制模組以支援手機搖桿和電腦鍵盤的原始輸入
-local ControlModule = nil
-pcall(function()
-    ControlModule = require(Player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
-end)
-
-local function startFreeFly()
-    if not Player.Character or not Player.Character:FindFirstChildOfClass("Humanoid") or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
-
-    local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
-    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-
-    -- 清除舊組件
-    if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
-    if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "FlyVelocity"
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 0, 0)
-    bv.Parent = hrp
-
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "FlyGyro"
-    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bg.P = 9e4
-    bg.CFrame = hrp.CFrame
-    bg.Parent = hrp
-
-    humanoid.PlatformStand = true
-
-    flyConnection = RunService.Heartbeat:Connect(function()
-        if not isFlying or not Player.Character or not hrp or not humanoid then
-            if flyConnection then flyConnection:Disconnect() end
-            flyConnection = nil
-            return
-        end
-
-        local cameraCFrame = Camera.CFrame
-        
-        -- 獲取原始移動向量 (X: 左右, Z: 前後, Y: 跳躍/上升)
-        -- 在 Roblox 控制中，Z = -1 是前進，Z = 1 是後退
-        local moveVector = Vector3.new(0,0,0)
-        if ControlModule then
-            moveVector = ControlModule:GetMoveVector()
-        end
-        
-        -- 旋轉：始終面向相機方向
-        bg.CFrame = cameraCFrame
-
-        -- 計算 3D 飛行方向
-        -- 前後移動使用 Camera.LookVector (Z 是反向的，所以用 -moveVector.Z)
-        -- 左右移動使用 Camera.RightVector
-        local direction = (cameraCFrame.LookVector * -moveVector.Z) + (cameraCFrame.RightVector * moveVector.X)
-        
-        if direction.Magnitude > 0 then
-            bv.Velocity = direction.Unit * flySpeed
-        else
-            -- 沒有輸入時保持靜止懸浮，給予極小向上力防止物理引擎下沉
-            bv.Velocity = Vector3.new(0, 0.1, 0)
-        end
-    end)
-end
-
-local function stopFreeFly()
-    isFlying = false
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
-    if Player.Character then
-        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
-        if hrp then
-            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
-            if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
-        end
-        if humanoid then
-            humanoid.PlatformStand = false
-        end
-    end
-end
-
--- 飛行按鈕點擊事件
-toggleFlyButton.MouseButton1Click:Connect(function()
-    isFlying = not isFlying
-    if isFlying then
-        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        toggleFlyButton.Text = "關閉自由飛行"
-        startFreeFly()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "3D 飛行已開啟",
-            Text = "推動搖桿/WASD 即朝視角方向飛行\n支援手機與電腦",
-            Duration = 3
-        })
-    else
-        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        toggleFlyButton.Text = "開啟自由飛行"
-        stopFreeFly()
-    end
-end)
-
--- 速度滑動條控制邏輯 (上限 400)
-local isDraggingSlider = false
-local function updateSlider(inputX)
-    local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
-    local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
-    local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
-    local percentage = relativeX / sliderFrameAbsoluteSizeX
-
-    flySpeed = math.floor(percentage * 390) + 10 -- 10 到 400
-    flySpeedLabel.Text = "飛行速度: " .. flySpeed
-    flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
-    flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
-end
-
-flySpeedSlider.MouseButton1Down:Connect(function() isDraggingSlider = true end)
-flySpeedSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true end end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = false
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        updateSlider(input.Position.X)
-    end
-end)
-
--- 面板切換
-flySettingsButton.MouseButton1Click:Connect(function()
-    MainPanel.Visible = false
-    InfoPanel.Visible = false
-    BattlePanel.Visible = false
-    SpeedPanel.Visible = false
-    FlyPanel.Visible = true
-    updatePanelStatus()
-end)
-
-flyBackButton.MouseButton1Click:Connect(function()
-    FlyPanel.Visible = false
-        AimbotPanel.Visible = false
-    MainPanel.Visible = true
-    updatePanelStatus()
-end)
--- ========== 自由飛行功能代碼結束 ==========
-
--- ========== ESP 果實功能強化版 ==========
-local espFruitEnabled = false
-local fruitEspConnection = nil
-
-local function createFruitEsp(v)
-    if not v:FindFirstChild("FruitESP") then
-        local billboard = Instance.new("BillboardGui")
-        billboard.Name = "FruitESP"
-        billboard.AlwaysOnTop = true
-        billboard.Size = UDim2.new(0, 100, 0, 50)
-        billboard.Adornee = v
-        
-        local lbl = Instance.new("TextLabel")
-        lbl.Parent = billboard
-        lbl.BackgroundTransparency = 1
-        lbl.Size = UDim2.new(1, 0, 1, 0)
-        lbl.Text = "🍎 " .. v.Name
-        lbl.TextColor3 = Color3.fromRGB(255, 50, 50)
-        lbl.TextStrokeTransparency = 0
-        lbl.TextScaled = true
-        lbl.Font = Enum.Font.GothamBold
-        
-        billboard.Parent = v
-    end
-end
-
-local function updateFruitEsp()
-    for _, v in pairs(workspace:GetChildren()) do
-        -- 偵測所有 Tool (果實通常是 Tool) 或者名字包含 Fruit 的物體
-        if v:IsA("Tool") or (v:IsA("Model") and string.find(v.Name:lower(), "fruit")) then
-            -- 排除玩家背著的果實
-            if not v:FindFirstChildOfClass("Humanoid") and not v.Parent:FindFirstChildOfClass("Humanoid") then
-                createFruitEsp(v)
-            end
-        end
-    end
-end
-
-espFruitButton.MouseButton1Click:Connect(function()
-    espFruitEnabled = not espFruitEnabled
-    if espFruitEnabled then
-        espFruitButton.Text = "ESP 果實 開啟"
-        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        
-        -- 立即執行一次
-        updateFruitEsp()
-        
-        -- 開啟持續偵測
-        fruitEspConnection = RunService.Heartbeat:Connect(function()
-            updateFruitEsp()
-        end)
-        
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "ESP 果實",
-            Text = "果實透視已開啟",
-            Duration = 3
-        })
-    else
-        espFruitButton.Text = "ESP 果實 關閉"
-        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
-        
-        if fruitEspConnection then
-            fruitEspConnection:Disconnect()
-            fruitEspConnection = nil
-        end
-        
-        -- 清除所有標籤
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v.Name == "FruitESP" then
-                v:Destroy()
-            end
-        end
-        
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "ESP 果實",
-            Text = "果實透視已關閉",
-            Duration = 3
-        })
-    end
-end)
--- ========== ESP 果實功能結束 ==========
-
-
-
-
-
-
 -- ========== updatePanelStatus（在圖標事件之前定義）==========
-local function updatePanelStatus()
+updatePanelStatus = function()
     if MainPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
         IconButton.BackgroundTransparency = 0
@@ -1256,9 +1009,6 @@ local function updatePanelStatus()
         IconButton.BackgroundTransparency = 0
     elseif BattlePanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
-        IconButton.BackgroundTransparency = 0
-        elseif FlyPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(150, 100, 255)
         IconButton.BackgroundTransparency = 0
     elseif SpeedPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(100, 255, 255)
@@ -1271,196 +1021,16 @@ end
 
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible or AimbotPanel.Visible then
-        MainPanel.Visible = false
-        InfoPanel.Visible = false
-        BattlePanel.Visible = false
-        SpeedPanel.Visible = false
-        FlyPanel.Visible = false
-        AimbotPanel.Visible = false
+    local panels = {MainPanel, InfoPanel, BattlePanel, SpeedPanel, FlyPanel}
+    local isAnyVisible = false
+    for _, panel in ipairs(panels) do if panel and panel.Visible then isAnyVisible = true break end end
+    if isAnyVisible then
+        for _, panel in ipairs(panels) do if panel then panel.Visible = false end end
     else
         MainPanel.Visible = true
     end
     updatePanelStatus()
 end)
-
-
-
--- ========== 自動瞄準 (Aimbot) 功能開始 ==========
-local AimbotSettings = {
-    Enabled = false,
-    Mode = "Nearest", -- "Nearest" 或 "Target"
-    TargetName = "",
-    Smoothing = 0.5 -- 瞄準平滑度
-}
-
-local aimbotConnection = nil
-local Camera = workspace.CurrentCamera
-
--- 創建瞄準設置面板
-local AimbotPanel = Instance.new("Frame")
-AimbotPanel.Name = "AimbotPanel"
-AimbotPanel.Size = UDim2.new(0, 300, 0, 320)
-AimbotPanel.Position = UDim2.new(0, 90, 0, 20)
-AimbotPanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
-AimbotPanel.BackgroundTransparency = 0.1
-AimbotPanel.Visible = false
-AimbotPanel.Parent = ScreenGui
-
-local AimbotPanelCorner = Instance.new("UICorner")
-AimbotPanelCorner.CornerRadius = UDim.new(0.05, 0)
-AimbotPanelCorner.Parent = AimbotPanel
-
--- 標題
-local aimbotTitle = Instance.new("TextLabel")
-aimbotTitle.Size = UDim2.new(0, 260, 0, 35)
-aimbotTitle.Position = UDim2.new(0, 20, 0, 10)
-aimbotTitle.BackgroundTransparency = 1
-aimbotTitle.Text = "自動瞄準設置"
-aimbotTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimbotTitle.TextScaled = true
-aimbotTitle.Font = Enum.Font.GothamBold
-aimbotTitle.Parent = AimbotPanel
-
--- 開啟/關閉按鈕
-local toggleAimbotButton = Instance.new("TextButton")
-toggleAimbotButton.Size = UDim2.new(0, 260, 0, 40)
-toggleAimbotButton.Position = UDim2.new(0, 20, 0, 55)
-toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-toggleAimbotButton.Text = "自動瞄準: 關閉"
-toggleAimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleAimbotButton.TextScaled = true
-toggleAimbotButton.Parent = AimbotPanel
-Instance.new("UICorner", toggleAimbotButton).CornerRadius = UDim.new(0, 8)
-
--- 切換模式按鈕
-local toggleModeButton = Instance.new("TextButton")
-toggleModeButton.Size = UDim2.new(0, 260, 0, 40)
-toggleModeButton.Position = UDim2.new(0, 20, 0, 105)
-toggleModeButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-toggleModeButton.Text = "模式: 瞄準最近玩家"
-toggleModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleModeButton.TextScaled = true
-toggleModeButton.Parent = AimbotPanel
-Instance.new("UICorner", toggleModeButton).CornerRadius = UDim.new(0, 8)
-
--- 指定玩家輸入框
-local targetInput = Instance.new("TextBox")
-targetInput.Size = UDim2.new(0, 260, 0, 40)
-targetInput.Position = UDim2.new(0, 20, 0, 155)
-targetInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-targetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-targetInput.PlaceholderText = "輸入目標玩家真名..."
-targetInput.Text = ""
-targetInput.TextScaled = true
-targetInput.Parent = AimbotPanel
-Instance.new("UICorner", targetInput).CornerRadius = UDim.new(0, 8)
-
--- 返回按鈕
-local aimbotBackButton = Instance.new("TextButton")
-aimbotBackButton.Size = UDim2.new(0, 260, 0, 40)
-aimbotBackButton.Position = UDim2.new(0, 20, 0, 260)
-aimbotBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
-aimbotBackButton.Text = "返回主頁"
-aimbotBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimbotBackButton.TextScaled = true
-aimbotBackButton.Parent = AimbotPanel
-Instance.new("UICorner", aimbotBackButton).CornerRadius = UDim.new(0, 8)
-
--- 獲取最近玩家的函數
-local function getNearestPlayer()
-    local closestPlayer = nil
-    local shortestDistance = math.huge
-    
-    for _, v in pairs(game.Players:GetPlayers()) do
-        if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-            local distance = (v.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
-            if distance < shortestDistance then
-                closestPlayer = v
-                shortestDistance = distance
-            end
-        end
-    end
-    return closestPlayer
-end
-
--- 獲取指定名稱玩家的函數
-local function getTargetPlayer(name)
-    for _, v in pairs(game.Players:GetPlayers()) do
-        if v.Name:lower() == name:lower() and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
-            return v
-        end
-    end
-    return nil
-end
-
--- 核心瞄準循環
-local function startAimbot()
-    if aimbotConnection then aimbotConnection:Disconnect() end
-    
-    aimbotConnection = RunService.RenderStepped:Connect(function()
-        if not AimbotSettings.Enabled or not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
-        
-        local target = nil
-        if AimbotSettings.Mode == "Nearest" then
-            target = getNearestPlayer()
-        else
-            target = getTargetPlayer(AimbotSettings.TargetName)
-        end
-        
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = target.Character.HumanoidRootPart.Position
-            -- 瞄準頭部或軀幹
-            local lookAt = CFrame.new(Camera.CFrame.Position, targetPos)
-            -- 使用 CFrame.lerp 實現平滑轉向
-            Camera.CFrame = Camera.CFrame:lerp(lookAt, AimbotSettings.Smoothing)
-        end
-    end)
-end
-
--- UI 事件連結
-toggleAimbotButton.MouseButton1Click:Connect(function()
-    AimbotSettings.Enabled = not AimbotSettings.Enabled
-    if AimbotSettings.Enabled then
-        toggleAimbotButton.Text = "自動瞄準: 開啟"
-        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        startAimbot()
-    else
-        toggleAimbotButton.Text = "自動瞄準: 關閉"
-        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        if aimbotConnection then aimbotConnection:Disconnect() end
-    end
-end)
-
-toggleModeButton.MouseButton1Click:Connect(function()
-    if AimbotSettings.Mode == "Nearest" then
-        AimbotSettings.Mode = "Target"
-        toggleModeButton.Text = "模式: 瞄準指定玩家"
-    else
-        AimbotSettings.Mode = "Nearest"
-        toggleModeButton.Text = "模式: 瞄準最近玩家"
-    end
-end)
-
-targetInput.FocusLost:Connect(function()
-    AimbotSettings.TargetName = targetInput.Text
-end)
-
-aimbotBackButton.MouseButton1Click:Connect(function()
-    AimbotPanel.Visible = false
-    MainPanel.Visible = true
-    updatePanelStatus()
-end)
-
--- 在主選單中添加按鈕導航
-local aimbotNavButton = makeMainButton("自動瞄準設置", Color3.fromRGB(255, 80, 150))
-aimbotNavButton.MouseButton1Click:Connect(function()
-    MainPanel.Visible = false
-    AimbotPanel.Visible = true
-    updatePanelStatus()
-end)
--- ========== 自動瞄準 (Aimbot) 功能結束 ==========
-
 
 -- ========== ESP 玩家功能 ==========
 local espEnabled = false
@@ -1550,47 +1120,83 @@ espButton.MouseButton1Click:Connect(function()
 end)
 -- ========== ESP 玩家功能結束 ==========
 
--- ========== ESP 果實功能 ==========
-
+-- ========== ESP 果實功能（強化掃描版） ==========
+local espFruitEnabled = false
 local fruitEspFolder = Instance.new("Folder")
 fruitEspFolder.Name = "FruitESPFolder"
 fruitEspFolder.Parent = workspace
-local fruitEspConnection = nil
+local fruitEspThread = nil
 
-local function scanFruits()
-    for _, v in ipairs(fruitEspFolder:GetChildren()) do v:Destroy() end
-    local containers = {"Fruits", "DroppedFruits", "MapItems"}
-    for _, containerName in ipairs(containers) do
-        local container = workspace:FindFirstChild(containerName)
-        if container then
-            for _, fruit in ipairs(container:GetChildren()) do
-                local part = fruit:IsA("BasePart") and fruit
-                    or (fruit:IsA("Model") and (fruit.PrimaryPart or fruit:FindFirstChildOfClass("BasePart")))
-                if part then
-                    local bb = Instance.new("BillboardGui")
-                    bb.Name = fruit.Name
-                    bb.Size = UDim2.new(0, 140, 0, 40)
-                    bb.StudsOffset = Vector3.new(0, 4, 0)
-                    bb.AlwaysOnTop = true
-                    bb.Adornee = part
-                    bb.Parent = fruitEspFolder
-                    local lbl = Instance.new("TextLabel")
-                    lbl.Size = UDim2.new(1, 0, 1, 0)
-                    lbl.BackgroundTransparency = 1
-                    lbl.Text = "🍎 " .. fruit.Name
-                    lbl.TextColor3 = Color3.fromRGB(255, 220, 50)
-                    lbl.TextScaled = true
-                    lbl.Font = Enum.Font.GothamBold
-                    lbl.TextStrokeTransparency = 0
-                    lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                    lbl.Parent = bb
-                end
+local function fruitBelongsToPlayer(item)
+    for _, p in ipairs(Players:GetPlayers()) do
+        local character = p.Character
+        local backpack = p:FindFirstChildOfClass("Backpack")
+        if (character and item:IsDescendantOf(character)) or (backpack and item:IsDescendantOf(backpack)) then return true end
+    end
+    local ancestor = item.Parent
+    while ancestor and ancestor ~= workspace do
+        if ancestor:FindFirstChildOfClass("Humanoid") then return true end
+        ancestor = ancestor.Parent
+    end
+    return false
+end
+
+local function fruitAnchor(item)
+    if item:IsA("Tool") then return item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart", true) end
+    if item:IsA("Model") then return item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true) end
+    return item:IsA("BasePart") and item or nil
+end
+
+local function clearFruitESP()
+    for _, child in ipairs(fruitEspFolder:GetChildren()) do child:Destroy() end
+end
+
+local function updateFruitESP()
+    clearFruitESP()
+    for _, item in ipairs(workspace:GetDescendants()) do
+        local name = item.Name:lower()
+        if (item:IsA("Tool") or name:find("fruit")) and not fruitBelongsToPlayer(item) then
+            local anchorPart = fruitAnchor(item)
+            if anchorPart then
+                local tag = Instance.new("BillboardGui")
+                tag.Name = "FruitESP"
+                tag.Adornee = anchorPart
+                tag.Size = UDim2.new(0, 180, 0, 45)
+                tag.StudsOffset = Vector3.new(0, 3.5, 0)
+                tag.AlwaysOnTop = true
+                tag.Parent = fruitEspFolder
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Text = "果實：" .. item.Name
+                label.TextColor3 = Color3.fromRGB(255, 220, 50)
+                label.TextStrokeTransparency = 0
+                label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                label.Font = Enum.Font.GothamBold
+                label.TextScaled = true
+                label.Parent = tag
             end
         end
     end
 end
 
-
+espFruitButton.Text = "ESP 果實：關閉"
+espFruitButton.MouseButton1Click:Connect(function()
+    espFruitEnabled = not espFruitEnabled
+    if espFruitEnabled then
+        espFruitButton.Text = "ESP 果實：開啟"
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        updateFruitESP()
+        fruitEspThread = task.spawn(function()
+            while espFruitEnabled do task.wait(1); if espFruitEnabled then updateFruitESP() end end
+        end)
+    else
+        espFruitButton.Text = "ESP 果實：關閉"
+        espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
+        if fruitEspThread then task.cancel(fruitEspThread); fruitEspThread = nil end
+        clearFruitESP()
+    end
+end)
 -- ========== ESP 果實功能結束 ==========
 
 -- 初始更新面板狀態
@@ -1919,3 +1525,180 @@ end)
 -- 玩家離開時清除（billboard 的 updateConnection 內部會自動清除）
 
 -- ========== ESP 功能代碼結束 ==========
+
+-- ========== 自由飛行（相機方向／手機與電腦通用） ==========
+local UserInputService = game:GetService("UserInputService")
+local FlySettings = {Enabled = false, Speed = 50, Minimum = 10, Maximum = 400}
+local flyConnection = nil
+local sliderDragging = false
+local controls = nil
+pcall(function()
+    controls = require(Player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+end)
+
+FlyPanel = Instance.new("Frame")
+FlyPanel.Name = "FlyPanel"
+FlyPanel.Size = UDim2.new(0, 300, 0, 250)
+FlyPanel.Position = UDim2.new(0, 90, 0, 20)
+FlyPanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FlyPanel.BackgroundTransparency = 0.1
+FlyPanel.Visible = false
+FlyPanel.Parent = ScreenGui
+Instance.new("UICorner", FlyPanel).CornerRadius = UDim.new(0, 12)
+
+local flyTitle = Instance.new("TextLabel")
+flyTitle.Size = UDim2.new(0, 260, 0, 35)
+flyTitle.Position = UDim2.new(0, 20, 0, 10)
+flyTitle.BackgroundTransparency = 1
+flyTitle.Text = "飛行設置"
+flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTitle.TextScaled = true
+flyTitle.Font = Enum.Font.GothamBold
+flyTitle.Parent = FlyPanel
+
+local flyToggleButton = Instance.new("TextButton")
+flyToggleButton.Size = UDim2.new(0, 260, 0, 42)
+flyToggleButton.Position = UDim2.new(0, 20, 0, 55)
+flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+flyToggleButton.Text = "開啟自由飛行"
+flyToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyToggleButton.TextScaled = true
+flyToggleButton.Parent = FlyPanel
+Instance.new("UICorner", flyToggleButton).CornerRadius = UDim.new(0, 8)
+
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Size = UDim2.new(0, 260, 0, 28)
+flySpeedLabel.Position = UDim2.new(0, 20, 0, 105)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.Font = Enum.Font.Gotham
+flySpeedLabel.TextScaled = true
+flySpeedLabel.Parent = FlyPanel
+
+local flySpeedTrack = Instance.new("TextButton")
+flySpeedTrack.Size = UDim2.new(0, 260, 0, 18)
+flySpeedTrack.Position = UDim2.new(0, 20, 0, 140)
+flySpeedTrack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+flySpeedTrack.Text = ""
+flySpeedTrack.AutoButtonColor = false
+flySpeedTrack.Parent = FlyPanel
+Instance.new("UICorner", flySpeedTrack).CornerRadius = UDim.new(0, 9)
+
+local flySpeedFill = Instance.new("Frame")
+flySpeedFill.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+flySpeedFill.BorderSizePixel = 0
+flySpeedFill.Parent = flySpeedTrack
+Instance.new("UICorner", flySpeedFill).CornerRadius = UDim.new(0, 9)
+
+local flyBackButton = Instance.new("TextButton")
+flyBackButton.Size = UDim2.new(0, 260, 0, 40)
+flyBackButton.Position = UDim2.new(0, 20, 0, 185)
+flyBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+flyBackButton.Text = "返回主頁"
+flyBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyBackButton.TextScaled = true
+flyBackButton.Parent = FlyPanel
+Instance.new("UICorner", flyBackButton).CornerRadius = UDim.new(0, 8)
+
+local function setFlySpeedFromPosition(x)
+    local width = math.max(flySpeedTrack.AbsoluteSize.X, 1)
+    local progress = math.clamp((x - flySpeedTrack.AbsolutePosition.X) / width, 0, 1)
+    FlySettings.Speed = math.floor(FlySettings.Minimum + (FlySettings.Maximum - FlySettings.Minimum) * progress + 0.5)
+    flySpeedFill.Size = UDim2.new(progress, 0, 1, 0)
+    flySpeedLabel.Text = "飛行速度：" .. tostring(FlySettings.Speed) .. " / 400"
+end
+
+local function refreshFlySpeedUI()
+    local progress = (FlySettings.Speed - FlySettings.Minimum) / (FlySettings.Maximum - FlySettings.Minimum)
+    flySpeedFill.Size = UDim2.new(progress, 0, 1, 0)
+    flySpeedLabel.Text = "飛行速度：" .. tostring(FlySettings.Speed) .. " / 400"
+end
+refreshFlySpeedUI()
+
+flySpeedTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        sliderDragging = true
+        setFlySpeedFromPosition(input.Position.X)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        setFlySpeedFromPosition(input.Position.X)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliderDragging = false end
+end)
+
+local function stopFreeFly()
+    FlySettings.Enabled = false
+    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+    local character = Player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if root then root.Anchored = false end
+    if humanoid then humanoid.AutoRotate = true end
+    flyToggleButton.Text = "開啟自由飛行"
+    flyToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+end
+
+local function startFreeFly()
+    local character = Player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid then return end
+    FlySettings.Enabled = true
+    root.Anchored = true
+    humanoid.AutoRotate = false
+    flyToggleButton.Text = "關閉自由飛行"
+    flyToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+    if flyConnection then flyConnection:Disconnect() end
+
+    flyConnection = RunService.RenderStepped:Connect(function(deltaTime)
+        local currentCharacter = Player.Character
+        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+        if not FlySettings.Enabled or not currentRoot then stopFreeFly(); return end
+        local move = Vector3.new(0, 0, 0)
+        if controls then pcall(function() move = controls:GetMoveVector() end) end
+        if move.Magnitude < 0.01 then
+            local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
+            if currentHumanoid then move = currentHumanoid.MoveDirection end
+        end
+        local camera = workspace.CurrentCamera
+        if camera and move.Magnitude > 0.01 then
+            -- W／搖桿前進是 -Z，轉為相機的正前方；包含鏡頭的上下角度。
+            local direction = camera.CFrame.LookVector * (-move.Z) + camera.CFrame.RightVector * move.X
+            if direction.Magnitude > 0.01 then
+                local nextPosition = currentRoot.Position + direction.Unit * FlySettings.Speed * deltaTime
+                local horizontalLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+                if horizontalLook.Magnitude > 0.01 then
+                    currentRoot.CFrame = CFrame.new(nextPosition, nextPosition + horizontalLook.Unit)
+                else
+                    currentRoot.CFrame = CFrame.new(nextPosition)
+                end
+            end
+        end
+    end)
+end
+
+flyToggleButton.MouseButton1Click:Connect(function()
+    if FlySettings.Enabled then stopFreeFly() else startFreeFly() end
+end)
+flySettingsButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    FlyPanel.Visible = true
+    updatePanelStatus()
+end)
+flyBackButton.MouseButton1Click:Connect(function()
+    FlyPanel.Visible = false
+    MainPanel.Visible = true
+    updatePanelStatus()
+end)
+Player.CharacterAdded:Connect(function()
+    if FlySettings.Enabled then task.wait(0.5); startFreeFly() end
+end)
+-- ========== 自由飛行功能結束 ==========
+
