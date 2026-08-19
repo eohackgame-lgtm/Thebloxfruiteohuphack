@@ -13,59 +13,8 @@ if not Player then
 end
 
 local PlayerGui = Player:WaitForChild("PlayerGui")
-
--- ========== 自動瞄準核心邏輯 ==========
-local AimbotSettings = {Enabled = false, Mode = "Nearest", TargetName = "", Smoothing = 0.35, Range = 1500}
-local aimbotConnection = nil
 local FlyPanel = nil
 local updatePanelStatus
-
-local function getNearestAimbotTarget()
-    local character = Player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-    local selected, distance = nil, AimbotSettings.Range
-    for _, candidate in ipairs(Players:GetPlayers()) do
-        local targetCharacter = candidate.Character
-        local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
-        local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
-        if candidate ~= Player and targetRoot and targetHumanoid and targetHumanoid.Health > 0 then
-            local currentDistance = (targetRoot.Position - root.Position).Magnitude
-            if currentDistance < distance then selected, distance = candidate, currentDistance end
-        end
-    end
-    return selected
-end
-
-local function getNamedAimbotTarget(userName)
-    if userName == "" then return nil end
-    for _, candidate in ipairs(Players:GetPlayers()) do
-        local targetCharacter = candidate.Character
-        local targetRoot = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
-        local targetHumanoid = targetCharacter and targetCharacter:FindFirstChildOfClass("Humanoid")
-        if candidate.Name:lower() == userName:lower() and targetRoot and targetHumanoid and targetHumanoid.Health > 0 then return candidate end
-    end
-    return nil
-end
-
-local function stopAimbot()
-    AimbotSettings.Enabled = false
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
-end
-
-local function startAimbot()
-    if aimbotConnection then aimbotConnection:Disconnect() end
-    aimbotConnection = RunService.RenderStepped:Connect(function()
-        if not AimbotSettings.Enabled then return end
-        local target = (AimbotSettings.Mode == "Nearest") and getNearestAimbotTarget() or getNamedAimbotTarget(AimbotSettings.TargetName)
-        local camera = workspace.CurrentCamera
-        local root = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-        if camera and root then
-            camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, root.Position), AimbotSettings.Smoothing)
-        end
-    end)
-end
-
 
 -- 顯示通知（加載時自動顯示）
 game.StarterGui:SetCore("SendNotification", {
@@ -395,7 +344,7 @@ infoTextCorner.Parent = infoText
 -- 創建自動戰鬥面板
 local BattlePanel = Instance.new("Frame")
 BattlePanel.Name = "BattlePanel"
-BattlePanel.Size = UDim2.new(0, 300, 0, 420)
+BattlePanel.Size = UDim2.new(0, 300, 0, 285)
 BattlePanel.Position = UDim2.new(0, 90, 0, 20)
 BattlePanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 BattlePanel.BackgroundTransparency = 0.1
@@ -463,71 +412,11 @@ local toggleAutoBattleCorner = Instance.new("UICorner")
 toggleAutoBattleCorner.CornerRadius = UDim.new(0, 8)
 toggleAutoBattleCorner.Parent = toggleAutoBattleButton
 
--- 自動瞄準控制：放在自動攻擊頁面內。
-local toggleAimbotButton = Instance.new("TextButton")
-toggleAimbotButton.Size = UDim2.new(0, 260, 0, 40)
-toggleAimbotButton.Position = UDim2.new(0, 20, 0, 200)
-toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-toggleAimbotButton.Text = "自動瞄準：關閉"
-toggleAimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleAimbotButton.TextScaled = true
-toggleAimbotButton.Parent = BattlePanel
-Instance.new("UICorner", toggleAimbotButton).CornerRadius = UDim.new(0, 8)
-
-local aimbotModeButton = Instance.new("TextButton")
-aimbotModeButton.Size = UDim2.new(0, 260, 0, 40)
-aimbotModeButton.Position = UDim2.new(0, 20, 0, 250)
-aimbotModeButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-aimbotModeButton.Text = "模式：瞄準附近玩家"
-aimbotModeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimbotModeButton.TextScaled = true
-aimbotModeButton.Parent = BattlePanel
-Instance.new("UICorner", aimbotModeButton).CornerRadius = UDim.new(0, 8)
-
-local aimbotNameInput = Instance.new("TextBox")
-aimbotNameInput.Size = UDim2.new(0, 260, 0, 40)
-aimbotNameInput.Position = UDim2.new(0, 20, 0, 300)
-aimbotNameInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-aimbotNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimbotNameInput.PlaceholderText = "輸入玩家使用者名稱（真名）"
-aimbotNameInput.Text = ""
-aimbotNameInput.TextScaled = true
-aimbotNameInput.ClearTextOnFocus = false
-aimbotNameInput.Parent = BattlePanel
-Instance.new("UICorner", aimbotNameInput).CornerRadius = UDim.new(0, 8)
-
-toggleAimbotButton.MouseButton1Click:Connect(function()
-    if AimbotSettings.Enabled then
-        stopAimbot()
-        toggleAimbotButton.Text = "自動瞄準：關閉"
-        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-    else
-        AimbotSettings.Enabled = true
-        startAimbot()
-        toggleAimbotButton.Text = "自動瞄準：開啟"
-        toggleAimbotButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-    end
-end)
-
-aimbotModeButton.MouseButton1Click:Connect(function()
-    if AimbotSettings.Mode == "Nearest" then
-        AimbotSettings.Mode = "Target"
-        aimbotModeButton.Text = "模式：瞄準指定玩家"
-    else
-        AimbotSettings.Mode = "Nearest"
-        aimbotModeButton.Text = "模式：瞄準附近玩家"
-    end
-end)
-
-aimbotNameInput.FocusLost:Connect(function()
-    AimbotSettings.TargetName = aimbotNameInput.Text
-end)
-
 -- 返回按鈕
 local battleBackButton = Instance.new("TextButton")
 battleBackButton.Name = "BattleBackButton"
 battleBackButton.Size = UDim2.new(0, 260, 0, 40)
-battleBackButton.Position = UDim2.new(0, 20, 0, 370)
+battleBackButton.Position = UDim2.new(0, 20, 0, 230)
 battleBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
 battleBackButton.Text = "返回主頁"
 battleBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1022,9 +911,11 @@ end
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
     local panels = {MainPanel, InfoPanel, BattlePanel, SpeedPanel, FlyPanel}
-    local isAnyVisible = false
-    for _, panel in ipairs(panels) do if panel and panel.Visible then isAnyVisible = true break end end
-    if isAnyVisible then
+    local anyVisible = false
+    for _, panel in ipairs(panels) do
+        if panel and panel.Visible then anyVisible = true break end
+    end
+    if anyVisible then
         for _, panel in ipairs(panels) do if panel then panel.Visible = false end end
     else
         MainPanel.Visible = true
@@ -1120,55 +1011,62 @@ espButton.MouseButton1Click:Connect(function()
 end)
 -- ========== ESP 玩家功能結束 ==========
 
--- ========== ESP 果實功能（強化掃描版） ==========
+-- ========== ESP 果實功能（強化版） ==========
 local espFruitEnabled = false
 local fruitEspFolder = Instance.new("Folder")
 fruitEspFolder.Name = "FruitESPFolder"
 fruitEspFolder.Parent = workspace
-local fruitEspThread = nil
+local fruitEspConnection = nil
+local fruitScanClock = 0
 
-local function fruitBelongsToPlayer(item)
-    for _, p in ipairs(Players:GetPlayers()) do
-        local character = p.Character
-        local backpack = p:FindFirstChildOfClass("Backpack")
+local function belongsToCharacterOrBackpack(item)
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        local character = targetPlayer.Character
+        local backpack = targetPlayer:FindFirstChildOfClass("Backpack")
         if (character and item:IsDescendantOf(character)) or (backpack and item:IsDescendantOf(backpack)) then return true end
     end
-    local ancestor = item.Parent
-    while ancestor and ancestor ~= workspace do
-        if ancestor:FindFirstChildOfClass("Humanoid") then return true end
-        ancestor = ancestor.Parent
+    local parent = item.Parent
+    while parent and parent ~= workspace do
+        if parent:FindFirstChildOfClass("Humanoid") then return true end
+        parent = parent.Parent
     end
     return false
 end
 
-local function fruitAnchor(item)
-    if item:IsA("Tool") then return item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart", true) end
-    if item:IsA("Model") then return item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true) end
-    return item:IsA("BasePart") and item or nil
+local function getFruitPart(item)
+    if item:IsA("Tool") then
+        return item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart", true)
+    elseif item:IsA("Model") then
+        return item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart", true)
+    elseif item:IsA("BasePart") then
+        return item
+    end
+    return nil
 end
 
 local function clearFruitESP()
     for _, child in ipairs(fruitEspFolder:GetChildren()) do child:Destroy() end
 end
 
-local function updateFruitESP()
+local function refreshFruitESP()
     clearFruitESP()
     for _, item in ipairs(workspace:GetDescendants()) do
-        local name = item.Name:lower()
-        if (item:IsA("Tool") or name:find("fruit")) and not fruitBelongsToPlayer(item) then
-            local anchorPart = fruitAnchor(item)
-            if anchorPart then
+        local isFruitCandidate = item:IsA("Tool") or (item:IsA("Model") and item.Name:lower():find("fruit") ~= nil)
+        if isFruitCandidate and not belongsToCharacterOrBackpack(item) then
+            local part = getFruitPart(item)
+            if part then
                 local tag = Instance.new("BillboardGui")
                 tag.Name = "FruitESP"
-                tag.Adornee = anchorPart
+                tag.Adornee = part
                 tag.Size = UDim2.new(0, 180, 0, 45)
                 tag.StudsOffset = Vector3.new(0, 3.5, 0)
                 tag.AlwaysOnTop = true
                 tag.Parent = fruitEspFolder
+
                 local label = Instance.new("TextLabel")
                 label.Size = UDim2.new(1, 0, 1, 0)
                 label.BackgroundTransparency = 1
-                label.Text = "果實：" .. item.Name
+                label.Text = "🍎 " .. item.Name
                 label.TextColor3 = Color3.fromRGB(255, 220, 50)
                 label.TextStrokeTransparency = 0
                 label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
@@ -1186,14 +1084,19 @@ espFruitButton.MouseButton1Click:Connect(function()
     if espFruitEnabled then
         espFruitButton.Text = "ESP 果實：開啟"
         espFruitButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        updateFruitESP()
-        fruitEspThread = task.spawn(function()
-            while espFruitEnabled do task.wait(1); if espFruitEnabled then updateFruitESP() end end
+        refreshFruitESP()
+        fruitScanClock = 0
+        fruitEspConnection = RunService.Heartbeat:Connect(function(deltaTime)
+            fruitScanClock = fruitScanClock + deltaTime
+            if fruitScanClock >= 0.75 then
+                fruitScanClock = 0
+                refreshFruitESP()
+            end
         end)
     else
         espFruitButton.Text = "ESP 果實：關閉"
         espFruitButton.BackgroundColor3 = Color3.fromRGB(220, 130, 50)
-        if fruitEspThread then task.cancel(fruitEspThread); fruitEspThread = nil end
+        if fruitEspConnection then fruitEspConnection:Disconnect(); fruitEspConnection = nil end
         clearFruitESP()
     end
 end)
@@ -1526,7 +1429,7 @@ end)
 
 -- ========== ESP 功能代碼結束 ==========
 
--- ========== 自由飛行（相機方向／手機與電腦通用） ==========
+-- ========== 自由飛行（400 速／視角連動） ==========
 local UserInputService = game:GetService("UserInputService")
 local FlySettings = {Enabled = false, Speed = 50, Minimum = 10, Maximum = 400}
 local flyConnection = nil
@@ -1575,20 +1478,20 @@ flySpeedLabel.Font = Enum.Font.Gotham
 flySpeedLabel.TextScaled = true
 flySpeedLabel.Parent = FlyPanel
 
-local flySpeedTrack = Instance.new("TextButton")
-flySpeedTrack.Size = UDim2.new(0, 260, 0, 18)
-flySpeedTrack.Position = UDim2.new(0, 20, 0, 140)
-flySpeedTrack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-flySpeedTrack.Text = ""
-flySpeedTrack.AutoButtonColor = false
-flySpeedTrack.Parent = FlyPanel
-Instance.new("UICorner", flySpeedTrack).CornerRadius = UDim.new(0, 9)
+local speedTrack = Instance.new("TextButton")
+speedTrack.Size = UDim2.new(0, 260, 0, 18)
+speedTrack.Position = UDim2.new(0, 20, 0, 140)
+speedTrack.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+speedTrack.Text = ""
+speedTrack.AutoButtonColor = false
+speedTrack.Parent = FlyPanel
+Instance.new("UICorner", speedTrack).CornerRadius = UDim.new(0, 9)
 
-local flySpeedFill = Instance.new("Frame")
-flySpeedFill.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-flySpeedFill.BorderSizePixel = 0
-flySpeedFill.Parent = flySpeedTrack
-Instance.new("UICorner", flySpeedFill).CornerRadius = UDim.new(0, 9)
+local speedFill = Instance.new("Frame")
+speedFill.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+speedFill.BorderSizePixel = 0
+speedFill.Parent = speedTrack
+Instance.new("UICorner", speedFill).CornerRadius = UDim.new(0, 9)
 
 local flyBackButton = Instance.new("TextButton")
 flyBackButton.Size = UDim2.new(0, 260, 0, 40)
@@ -1600,31 +1503,29 @@ flyBackButton.TextScaled = true
 flyBackButton.Parent = FlyPanel
 Instance.new("UICorner", flyBackButton).CornerRadius = UDim.new(0, 8)
 
-local function setFlySpeedFromPosition(x)
-    local width = math.max(flySpeedTrack.AbsoluteSize.X, 1)
-    local progress = math.clamp((x - flySpeedTrack.AbsolutePosition.X) / width, 0, 1)
-    FlySettings.Speed = math.floor(FlySettings.Minimum + (FlySettings.Maximum - FlySettings.Minimum) * progress + 0.5)
-    flySpeedFill.Size = UDim2.new(progress, 0, 1, 0)
+local function setFlySpeed(x)
+    local width = math.max(speedTrack.AbsoluteSize.X, 1)
+    local alpha = math.clamp((x - speedTrack.AbsolutePosition.X) / width, 0, 1)
+    FlySettings.Speed = math.floor(FlySettings.Minimum + (FlySettings.Maximum - FlySettings.Minimum) * alpha + 0.5)
+    speedFill.Size = UDim2.new(alpha, 0, 1, 0)
     flySpeedLabel.Text = "飛行速度：" .. tostring(FlySettings.Speed) .. " / 400"
 end
 
-local function refreshFlySpeedUI()
-    local progress = (FlySettings.Speed - FlySettings.Minimum) / (FlySettings.Maximum - FlySettings.Minimum)
-    flySpeedFill.Size = UDim2.new(progress, 0, 1, 0)
+local function refreshFlySpeedLabel()
+    local alpha = (FlySettings.Speed - FlySettings.Minimum) / (FlySettings.Maximum - FlySettings.Minimum)
+    speedFill.Size = UDim2.new(alpha, 0, 1, 0)
     flySpeedLabel.Text = "飛行速度：" .. tostring(FlySettings.Speed) .. " / 400"
 end
-refreshFlySpeedUI()
+refreshFlySpeedLabel()
 
-flySpeedTrack.InputBegan:Connect(function(input)
+speedTrack.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         sliderDragging = true
-        setFlySpeedFromPosition(input.Position.X)
+        setFlySpeed(input.Position.X)
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        setFlySpeedFromPosition(input.Position.X)
-    end
+    if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then setFlySpeed(input.Position.X) end
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliderDragging = false end
@@ -1653,29 +1554,23 @@ local function startFreeFly()
     flyToggleButton.Text = "關閉自由飛行"
     flyToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
     if flyConnection then flyConnection:Disconnect() end
-
     flyConnection = RunService.RenderStepped:Connect(function(deltaTime)
         local currentCharacter = Player.Character
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
         if not FlySettings.Enabled or not currentRoot then stopFreeFly(); return end
-        local move = Vector3.new(0, 0, 0)
-        if controls then pcall(function() move = controls:GetMoveVector() end) end
-        if move.Magnitude < 0.01 then
+        local movement = Vector3.new(0, 0, 0)
+        if controls then pcall(function() movement = controls:GetMoveVector() end) end
+        if movement.Magnitude < 0.01 then
             local currentHumanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
-            if currentHumanoid then move = currentHumanoid.MoveDirection end
+            if currentHumanoid then movement = currentHumanoid.MoveDirection end
         end
         local camera = workspace.CurrentCamera
-        if camera and move.Magnitude > 0.01 then
-            -- W／搖桿前進是 -Z，轉為相機的正前方；包含鏡頭的上下角度。
-            local direction = camera.CFrame.LookVector * (-move.Z) + camera.CFrame.RightVector * move.X
+        if camera and movement.Magnitude > 0.01 then
+            local direction = camera.CFrame.LookVector * (-movement.Z) + camera.CFrame.RightVector * movement.X
             if direction.Magnitude > 0.01 then
                 local nextPosition = currentRoot.Position + direction.Unit * FlySettings.Speed * deltaTime
-                local horizontalLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
-                if horizontalLook.Magnitude > 0.01 then
-                    currentRoot.CFrame = CFrame.new(nextPosition, nextPosition + horizontalLook.Unit)
-                else
-                    currentRoot.CFrame = CFrame.new(nextPosition)
-                end
+                local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+                currentRoot.CFrame = flatLook.Magnitude > 0.01 and CFrame.new(nextPosition, nextPosition + flatLook.Unit) or CFrame.new(nextPosition)
             end
         end
     end)
