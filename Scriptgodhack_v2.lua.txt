@@ -342,7 +342,7 @@ infoTextCorner.Parent = infoText
 -- 創建自動戰鬥面板
 local BattlePanel = Instance.new("Frame")
 BattlePanel.Name = "BattlePanel"
-BattlePanel.Size = UDim2.new(0, 300, 0, 395)
+BattlePanel.Size = UDim2.new(0, 300, 0, 285)
 BattlePanel.Position = UDim2.new(0, 90, 0, 20)
 BattlePanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 BattlePanel.BackgroundTransparency = 0.1
@@ -410,50 +410,11 @@ local toggleAutoBattleCorner = Instance.new("UICorner")
 toggleAutoBattleCorner.CornerRadius = UDim.new(0, 8)
 toggleAutoBattleCorner.Parent = toggleAutoBattleButton
 
--- 自動攻擊距離設定（手機與電腦均可輸入數字）
-local attackDistanceLabel = Instance.new("TextLabel")
-attackDistanceLabel.Name = "AttackDistanceLabel"
-attackDistanceLabel.Size = UDim2.new(0, 260, 0, 24)
-attackDistanceLabel.Position = UDim2.new(0, 20, 0, 201)
-attackDistanceLabel.BackgroundTransparency = 1
-attackDistanceLabel.Text = "自動攻擊距離：" .. tostring(FastAttackSettings.Distance)
-attackDistanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-attackDistanceLabel.TextScaled = true
-attackDistanceLabel.Font = Enum.Font.Gotham
-attackDistanceLabel.Parent = BattlePanel
-
-local attackDistanceInput = Instance.new("TextBox")
-attackDistanceInput.Name = "AttackDistanceInput"
-attackDistanceInput.Size = UDim2.new(0, 260, 0, 40)
-attackDistanceInput.Position = UDim2.new(0, 20, 0, 230)
-attackDistanceInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-attackDistanceInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-attackDistanceInput.Font = Enum.Font.Gotham
-attackDistanceInput.TextScaled = true
-attackDistanceInput.PlaceholderText = "輸入距離：25 - 1000"
-attackDistanceInput.Text = tostring(FastAttackSettings.Distance)
-attackDistanceInput.ClearTextOnFocus = false
-attackDistanceInput.Parent = BattlePanel
-Instance.new("UICorner", attackDistanceInput).CornerRadius = UDim.new(0, 8)
-
-local applyAttackDistanceButton = Instance.new("TextButton")
-applyAttackDistanceButton.Name = "ApplyAttackDistanceButton"
-applyAttackDistanceButton.Size = UDim2.new(0, 260, 0, 40)
-applyAttackDistanceButton.Position = UDim2.new(0, 20, 0, 280)
-applyAttackDistanceButton.BackgroundColor3 = Color3.fromRGB(80, 130, 200)
-applyAttackDistanceButton.Text = "套用攻擊距離"
-applyAttackDistanceButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-applyAttackDistanceButton.TextScaled = true
-applyAttackDistanceButton.Font = Enum.Font.Gotham
-applyAttackDistanceButton.Parent = BattlePanel
-Instance.new("UICorner", applyAttackDistanceButton).CornerRadius = UDim.new(0, 8)
-
-
 -- 返回按鈕
 local battleBackButton = Instance.new("TextButton")
 battleBackButton.Name = "BattleBackButton"
 battleBackButton.Size = UDim2.new(0, 260, 0, 40)
-battleBackButton.Position = UDim2.new(0, 20, 0, 340)
+battleBackButton.Position = UDim2.new(0, 20, 0, 230)
 battleBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
 battleBackButton.Text = "返回主頁"
 battleBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -906,37 +867,6 @@ FastAttackModule.FastAttack = (function()
     getgenv().rz_FastAttack = FastAttack
     return FastAttack
 end)()
-
-local function applyAttackDistance()
-    local value = tonumber(attackDistanceInput.Text)
-    if not value then
-        attackDistanceInput.Text = tostring(FastAttackSettings.Distance)
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "自動攻擊距離",
-            Text = "請輸入 25 至 1000 的數字",
-            Duration = 3
-        })
-        return
-    end
-
-    value = math.clamp(math.floor(value), 25, 1000)
-    FastAttackSettings.Distance = value
-    if FastAttackModule.FastAttack then
-        FastAttackModule.FastAttack.Distance = value
-    end
-    attackDistanceInput.Text = tostring(value)
-    attackDistanceLabel.Text = "自動攻擊距離：" .. tostring(value)
-    game.StarterGui:SetCore("SendNotification", {
-        Title = "自動攻擊距離",
-        Text = "已設定為 " .. tostring(value),
-        Duration = 3
-    })
-end
-
-applyAttackDistanceButton.MouseButton1Click:Connect(applyAttackDistance)
-attackDistanceInput.FocusLost:Connect(function(enterPressed)
-    if enterPressed then applyAttackDistance() end
-end)
 
 -- 自動選擇隊伍功能
 local function setupAutoTeam()
