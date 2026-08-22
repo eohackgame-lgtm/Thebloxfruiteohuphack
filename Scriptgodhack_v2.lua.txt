@@ -676,7 +676,7 @@ local function makePhysicalMover(part, velocityName, gyroName)
     return velocity, gyro
 end
 
--- 第一個自動海上飛行：穩定控制角色根部，不再對沒有控制權的船座施加無效速度。
+-- 自動海上飛行：單一連線與安全清理，避免連續按鈕造成多重移動循環。
 local isMoving = false
 local moveConnection = nil
 local SEA_FLY_SPEED = 300
@@ -684,7 +684,10 @@ local SEA_FLY_HEIGHT = 180
 
 local function stopSeaFly(showNotification)
     isMoving = false
-    if moveConnection then moveConnection:Disconnect(); moveConnection = nil end
+    if moveConnection then
+        moveConnection:Disconnect()
+        moveConnection = nil
+    end
     if showNotification then
         game.StarterGui:SetCore("SendNotification", {
             Title = "已停止",
@@ -696,9 +699,8 @@ end
 
 local function startSeaFly()
     local character = Player.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not root then
+    if not root then
         game.StarterGui:SetCore("SendNotification", {
             Title = "自動海上飛行",
             Text = "找不到角色，請重生後再試",
@@ -707,42 +709,46 @@ local function startSeaFly()
         return
     end
 
-    -- 人物坐在船座時先離座，避免座位約束將人物位置拉回船上。
-    if humanoid.SeatPart then
-        humanoid.Sit = false
-    end
+    -- 每次開始前先清理舊連線，避免速度疊加、卡住或位置跳動。
     stopSeaFly(false)
     isMoving = true
-    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+
+    local startPosition = root.Position
+    root.CFrame = CFrame.new(startPosition.X, SEA_FLY_HEIGHT, startPosition.Z) * CFrame.Angles(0, math.rad(90), 0)
 
     moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
         if not isMoving then
             stopSeaFly(false)
             return
         end
+
         local currentCharacter = Player.Character
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
         if not currentRoot then
             stopSeaFly(false)
             return
         end
+
         local position = currentRoot.Position
-        -- 錄影確認原本負 X 軸方向與船頭方向相反，改為正 X 軸與反向 yaw。
-        local nextPosition = Vector3.new(position.X + SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
-        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(-90), 0)
-        currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
+        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
     end)
 
     game.StarterGui:SetCore("SendNotification", {
         Title = "自動海上飛行",
-        Text = "已啟動：人物沿海面方向飛行",
+        Text = "已啟動，速度 300、高度 180",
         Duration = 3
     })
 end
 
 teleportButton.MouseButton1Click:Connect(startSeaFly)
-stopButton.MouseButton1Click:Connect(function() stopSeaFly(true) end)
-Player.CharacterAdded:Connect(function() stopSeaFly(false) end)
+stopButton.MouseButton1Click:Connect(function()
+    stopSeaFly(true)
+end)
+
+Player.CharacterAdded:Connect(function()
+    stopSeaFly(false)
+end)
 
 -- 信息按钮功能
 infoButton.MouseButton1Click:Connect(function()
