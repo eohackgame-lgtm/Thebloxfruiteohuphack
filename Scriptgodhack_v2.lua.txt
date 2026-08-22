@@ -727,8 +727,9 @@ local function startSeaFly()
             return
         end
         local position = currentRoot.Position
-        local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
-        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
+        -- 錄影確認原本負 X 軸方向與船頭方向相反，改為正 X 軸與反向 yaw。
+        local nextPosition = Vector3.new(position.X + SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
+        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(-90), 0)
         currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     end)
 
@@ -1058,7 +1059,7 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始（人物物理全視角版） ==========
+-- ========== 自由飛行功能代碼開始（坐船同步全視角版） ==========
 local UserInputService = game:GetService("UserInputService")
 local ControlModule = nil
 pcall(function()
@@ -1066,6 +1067,7 @@ pcall(function()
 end)
 
 local freeFlyPart = nil
+local freeFlyWasSeated = false
 toggleFlyButton.Text = "自由飛行：已關閉"
 toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
 
@@ -1106,26 +1108,22 @@ local function startFreeFly()
         return
     end
 
-    local wasSeated = humanoid.SeatPart ~= nil
-    if wasSeated then
-        humanoid.Sit = false
-        task.wait()
-    end
-    -- 重新取得根部，確保解除座位後控制的是玩家實體而非船座。
-    character = Player.Character
-    humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    root = character and character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not root then return end
-
     isFlying = true
     freeFlyPart = root
-    local velocity, gyro = makePhysicalMover(root, "FreeFlyVelocity", "FreeFlyGyro")
-    humanoid.PlatformStand = true
+    freeFlyWasSeated = humanoid.SeatPart ~= nil
+    local velocity, gyro = nil, nil
+    if not freeFlyWasSeated then
+        velocity, gyro = makePhysicalMover(root, "FreeFlyVelocity", "FreeFlyGyro")
+        humanoid.PlatformStand = true
+    else
+        -- 保留駕駛座；座位焊接會把船與角色根部同步，勿在此離座。
+        humanoid.PlatformStand = false
+    end
     humanoid.AutoRotate = false
     toggleFlyButton.Text = "自由飛行：已開啟"
     toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 
-    flyConnection = RunService.Heartbeat:Connect(function()
+    flyConnection = RunService.Heartbeat:Connect(function(deltaTime)
         local currentCharacter = Player.Character
         local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
@@ -1134,23 +1132,41 @@ local function startFreeFly()
             stopFreeFly()
             return
         end
-        if currentRoot ~= freeFlyPart then
+
+        local seatedNow = currentHumanoid.SeatPart ~= nil
+        if currentRoot ~= freeFlyPart or seatedNow ~= freeFlyWasSeated then
             destroyNamedMover(freeFlyPart, "FreeFlyVelocity", "FreeFlyGyro")
             freeFlyPart = currentRoot
-            velocity, gyro = makePhysicalMover(currentRoot, "FreeFlyVelocity", "FreeFlyGyro")
+            freeFlyWasSeated = seatedNow
+            velocity, gyro = nil, nil
+            if not seatedNow then
+                velocity, gyro = makePhysicalMover(currentRoot, "FreeFlyVelocity", "FreeFlyGyro")
+                currentHumanoid.PlatformStand = true
+            else
+                currentHumanoid.PlatformStand = false
+            end
         end
 
         local input = getRawFlyInput(currentHumanoid)
         local look = camera.CFrame.LookVector
-        -- 人物飛行保留 3 倍垂直權重，抬頭前進時明顯高於水平分量。
-        local direction = Vector3.new(look.X, look.Y * 3, look.Z) * (-input.Z) + camera.CFrame.RightVector * input.X
-        velocity.Velocity = direction.Magnitude > 0.01 and direction.Unit * flySpeed or Vector3.new(0, 0, 0)
-        gyro.CFrame = CFrame.lookAt(freeFlyPart.Position, freeFlyPart.Position + look)
+        -- 坐船與未坐船都使用相同完整視角向量；抬頭時 Y 權重提高。
+        local desired = Vector3.new(look.X, look.Y * 3, look.Z) * (-input.Z) + camera.CFrame.RightVector * input.X
+        if freeFlyWasSeated then
+            -- 錄影顯示角色根部的 CFrame 移動能帶動目前船座約束下的船體。
+            if desired.Magnitude > 0.01 then
+                local nextPosition = currentRoot.Position + desired.Unit * flySpeed * deltaTime
+                currentRoot.CFrame = CFrame.lookAt(nextPosition, nextPosition + look)
+                currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        else
+            velocity.Velocity = desired.Magnitude > 0.01 and desired.Unit * flySpeed or Vector3.new(0, 0, 0)
+            gyro.CFrame = CFrame.lookAt(freeFlyPart.Position, freeFlyPart.Position + look)
+        end
     end)
 
     game.StarterGui:SetCore("SendNotification", {
         Title = "自由飛行已開啟",
-        Text = wasSeated and "已離開座位後使用人物飛行" or "使用人物物理飛行：抬頭前進會大幅上升",
+        Text = freeFlyWasSeated and "保留駕駛座並同步船體移動" or "人物物理飛行：抬頭前進會大幅上升",
         Duration = 3
     })
 end
