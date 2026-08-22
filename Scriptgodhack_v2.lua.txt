@@ -638,7 +638,80 @@ flyBackCorner.Parent = flyBackButton
 
 
 
--- 自動海上飛行：單一連線與安全清理，避免連續按鈕造成多重移動循環。
+-- 船體偵測與移動輔助：坐在船上時，優先對座位所在的船模型進行位移。
+local function getSeatedVessel(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local seat = humanoid and humanoid.SeatPart
+    if not seat or not seat:IsA("BasePart") then return nil end
+
+    local vessel = nil
+    local current = seat.Parent
+    while current and current ~= workspace do
+        if current:IsA("Model") then vessel = current end
+        current = current.Parent
+    end
+    return vessel or seat
+end
+
+local function getContainerPivot(container)
+    if container:IsA("Model") then return container:GetPivot() end
+    return container.CFrame
+end
+
+local function pivotContainer(container, targetCFrame)
+    if container:IsA("Model") then
+        container:PivotTo(targetCFrame)
+    else
+        container.CFrame = targetCFrame
+    end
+end
+
+local function getObstacleLift(container, fromPosition, movement)
+    local horizontal = Vector3.new(movement.X, 0, movement.Z)
+    if horizontal.Magnitude < 0.01 then return Vector3.new(0, 0, 0) end
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {container, Player.Character}
+    params.IgnoreWater = true
+    local rayOrigin = fromPosition + Vector3.new(0, 8, 0)
+    local hit = workspace:Raycast(rayOrigin, horizontal.Unit * math.min(horizontal.Magnitude + 20, 80), params)
+    if hit then
+        -- 遇到島嶼／石頭時先提高高度，避免船首卡住；不改變水平方向。
+        local neededHeight = math.clamp(hit.Position.Y - fromPosition.Y + 25, 25, 90)
+        return Vector3.new(0, neededHeight, 0)
+    end
+    return Vector3.new(0, 0, 0)
+end
+
+local function moveVesselOrCharacter(character, root, movement, facingDirection)
+    local vessel = getSeatedVessel(character)
+    if vessel then
+        local pivot = getContainerPivot(vessel)
+        local adjustedMovement = movement + getObstacleLift(vessel, pivot.Position, movement)
+        local nextPosition = pivot.Position + adjustedMovement
+        local flatFacing = Vector3.new(facingDirection.X, 0, facingDirection.Z)
+        local targetCFrame
+        if flatFacing.Magnitude > 0.01 then
+            targetCFrame = CFrame.lookAt(nextPosition, nextPosition + flatFacing.Unit)
+        else
+            targetCFrame = CFrame.new(nextPosition) * (pivot - pivot.Position)
+        end
+        pivotContainer(vessel, targetCFrame)
+        return true
+    end
+
+    local nextPosition = root.Position + movement
+    local flatFacing = Vector3.new(facingDirection.X, 0, facingDirection.Z)
+    if flatFacing.Magnitude > 0.01 then
+        root.CFrame = CFrame.lookAt(nextPosition, nextPosition + flatFacing.Unit)
+    else
+        root.CFrame = CFrame.new(nextPosition)
+    end
+    return false
+end
+
+-- 自動海上飛行：坐船時移動整艘船；未坐船時才移動角色。
 local isMoving = false
 local moveConnection = nil
 local SEA_FLY_SPEED = 300
@@ -671,19 +744,14 @@ local function startSeaFly()
         return
     end
 
-    -- 每次開始前先清理舊連線，避免速度疊加、卡住或位置跳動。
     stopSeaFly(false)
     isMoving = true
-
-    local startPosition = root.Position
-    root.CFrame = CFrame.new(startPosition.X, SEA_FLY_HEIGHT, startPosition.Z) * CFrame.Angles(0, math.rad(90), 0)
 
     moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
         if not isMoving then
             stopSeaFly(false)
             return
         end
-
         local currentCharacter = Player.Character
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
         if not currentRoot then
@@ -691,26 +759,30 @@ local function startSeaFly()
             return
         end
 
-        local position = currentRoot.Position
-        local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
-        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
+        local vessel = getSeatedVessel(currentCharacter)
+        if vessel then
+            local pivot = getContainerPivot(vessel)
+            local nextPosition = Vector3.new(pivot.Position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, pivot.Position.Z)
+            local target = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
+            -- PivotTo 直接移動船模型，避免角色脫離船體及船被石頭阻擋。
+            pivotContainer(vessel, target)
+        else
+            local position = currentRoot.Position
+            local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
+            currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
+        end
     end)
 
     game.StarterGui:SetCore("SendNotification", {
         Title = "自動海上飛行",
-        Text = "已啟動，速度 300、高度 180",
+        Text = getSeatedVessel(character) and "已啟動：優先移動船體" or "已啟動：目前未坐船，移動角色",
         Duration = 3
     })
 end
 
 teleportButton.MouseButton1Click:Connect(startSeaFly)
-stopButton.MouseButton1Click:Connect(function()
-    stopSeaFly(true)
-end)
-
-Player.CharacterAdded:Connect(function()
-    stopSeaFly(false)
-end)
+stopButton.MouseButton1Click:Connect(function() stopSeaFly(true) end)
+Player.CharacterAdded:Connect(function() stopSeaFly(false) end)
 
 -- 信息按钮功能
 infoButton.MouseButton1Click:Connect(function()
@@ -1099,7 +1171,8 @@ local function startFreeFly()
 
     clearFlyObjects(root)
     isFlying = true
-    root.Anchored = true
+    -- 坐船時保留角色與座位的連結，讓船模型帶著角色一起飛；未坐船才固定角色。
+    root.Anchored = getSeatedVessel(character) == nil
     humanoid.PlatformStand = false
     humanoid.AutoRotate = false
     toggleFlyButton.Text = "自由飛行：已開啟"
@@ -1123,14 +1196,10 @@ local function startFreeFly()
         -- 因此鏡頭指向天空時，前進會真正向天空位移；指向地面則向下位移。
         local desiredDirection = camera.CFrame.LookVector * forwardAmount + camera.CFrame.RightVector * sideAmount
         if desiredDirection.Magnitude > 0.01 then
-            local nextPosition = currentRoot.Position + desiredDirection.Unit * flySpeed * deltaTime
-            -- 角色只採用相機的水平朝向，避免模型跟著上下翻轉；移動本身仍是完整 3D。
-            local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
-            if flatLook.Magnitude > 0.01 then
-                currentRoot.CFrame = CFrame.new(nextPosition, nextPosition + flatLook.Unit)
-            else
-                currentRoot.CFrame = CFrame.new(nextPosition)
-            end
+            local movement = desiredDirection.Unit * flySpeed * deltaTime
+            -- 坐船時移動船體，角色會與船座同步；未坐船才移動角色本身。
+            local movedVessel = moveVesselOrCharacter(currentCharacter, currentRoot, movement, camera.CFrame.LookVector)
+            currentRoot.Anchored = not movedVessel
         end
     end)
 end
