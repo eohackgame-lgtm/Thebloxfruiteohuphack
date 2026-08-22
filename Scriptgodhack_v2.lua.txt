@@ -1027,76 +1027,41 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始 (跨平台 3D 視角連動版) ==========
+-- ========== 自由飛行功能代碼開始（完整相機視角版） ==========
 local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-
--- 獲取 Roblox 控制模組以支援手機搖桿和電腦鍵盤的原始輸入
 local ControlModule = nil
 pcall(function()
     ControlModule = require(Player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
 end)
 
-local function startFreeFly()
-    if not Player.Character or not Player.Character:FindFirstChildOfClass("Humanoid") or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
+-- 顯示「目前狀態」，避免按鈕文字與顏色被理解為相反含義。
+toggleFlyButton.Text = "自由飛行：已關閉"
+toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
 
-    local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
-    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+local function clearFlyObjects(root)
+    if not root then return end
+    local velocity = root:FindFirstChild("FlyVelocity")
+    local gyro = root:FindFirstChild("FlyGyro")
+    if velocity then velocity:Destroy() end
+    if gyro then gyro:Destroy() end
+end
 
-    -- 清除舊組件
-    if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
-    if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "FlyVelocity"
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 0, 0)
-    bv.Parent = hrp
-
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "FlyGyro"
-    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bg.P = 9e4
-    bg.CFrame = hrp.CFrame
-    bg.Parent = hrp
-
-    humanoid.PlatformStand = true
-
-    flyConnection = RunService.Heartbeat:Connect(function()
-        if not isFlying or not Player.Character or not hrp or not humanoid then
-            if flyConnection then flyConnection:Disconnect() end
-            flyConnection = nil
-            return
+local function getRawFlyInput(humanoid)
+    local input = Vector3.new(0, 0, 0)
+    if ControlModule then
+        pcall(function() input = ControlModule:GetMoveVector() end)
+    end
+    -- 部分手機控制器在特殊狀態下不回傳 ControlModule 向量，使用原生移動方向作為備援。
+    if input.Magnitude < 0.01 and humanoid then
+        local worldMove = humanoid.MoveDirection
+        if worldMove.Magnitude > 0.01 then
+            local camera = workspace.CurrentCamera
+            if camera then
+                input = Vector3.new(worldMove:Dot(camera.CFrame.RightVector), 0, -worldMove:Dot(camera.CFrame.LookVector))
+            end
         end
-
-        local cameraCFrame = Camera.CFrame
-        
-        -- 獲取原始移動向量 (X: 左右, Z: 前後, Y: 跳躍/上升)
-        -- 在 Roblox 控制中，Z = -1 是前進，Z = 1 是後退
-        local moveVector = Vector3.new(0,0,0)
-        if ControlModule then
-            moveVector = ControlModule:GetMoveVector()
-        end
-        
-        -- 旋轉：始終面向相機方向
-        bg.CFrame = cameraCFrame
-
-        -- 計算 3D 飛行方向：前進沿相機視角；鏡頭朝上時額外提高上升比例。
-        local forwardInput = -moveVector.Z
-        local forwardDirection = cameraCFrame.LookVector * forwardInput
-        if forwardInput > 0 and cameraCFrame.LookVector.Y > 0 then
-            -- 保留「看向哪裡就飛向哪裡」，但讓抬頭前進的垂直分量更明顯。
-            forwardDirection = forwardDirection + Vector3.new(0, cameraCFrame.LookVector.Y * forwardInput * 1.25, 0)
-        end
-        local direction = forwardDirection + (cameraCFrame.RightVector * moveVector.X)
-        
-        if direction.Magnitude > 0 then
-            bv.Velocity = direction.Unit * flySpeed
-        else
-            -- 沒有輸入時保持靜止懸浮，給予極小向上力防止物理引擎下沉
-            bv.Velocity = Vector3.new(0, 0.1, 0)
-        end
-    end)
+    end
+    return input
 end
 
 local function stopFreeFly()
@@ -1105,81 +1070,129 @@ local function stopFreeFly()
         flyConnection:Disconnect()
         flyConnection = nil
     end
-    if Player.Character then
-        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
-        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
-        if hrp then
-            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
-            if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
-        end
-        if humanoid then
-            humanoid.PlatformStand = false
-        end
+
+    local character = Player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if root then
+        root.Anchored = false
+        clearFlyObjects(root)
     end
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.AutoRotate = true
+    end
+    toggleFlyButton.Text = "自由飛行：已關閉"
+    toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
 end
 
--- 飛行按鈕點擊事件
+local function startFreeFly()
+    -- 防止重複連線；並在每次開啟時讀取目前角色與相機。
+    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+    local character = Player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then
+        isFlying = false
+        return
+    end
+
+    clearFlyObjects(root)
+    isFlying = true
+    root.Anchored = true
+    humanoid.PlatformStand = false
+    humanoid.AutoRotate = false
+    toggleFlyButton.Text = "自由飛行：已開啟"
+    toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+
+    flyConnection = RunService.RenderStepped:Connect(function(deltaTime)
+        local currentCharacter = Player.Character
+        local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
+        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+        local camera = workspace.CurrentCamera
+        if not isFlying or not currentHumanoid or not currentRoot or not camera then
+            stopFreeFly()
+            return
+        end
+
+        local moveInput = getRawFlyInput(currentHumanoid)
+        local forwardAmount = -moveInput.Z
+        local sideAmount = moveInput.X
+
+        -- 關鍵：前後方向直接使用相機完整 LookVector（包含 Y 軸）。
+        -- 因此鏡頭指向天空時，前進會真正向天空位移；指向地面則向下位移。
+        local desiredDirection = camera.CFrame.LookVector * forwardAmount + camera.CFrame.RightVector * sideAmount
+        if desiredDirection.Magnitude > 0.01 then
+            local nextPosition = currentRoot.Position + desiredDirection.Unit * flySpeed * deltaTime
+            -- 角色只採用相機的水平朝向，避免模型跟著上下翻轉；移動本身仍是完整 3D。
+            local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+            if flatLook.Magnitude > 0.01 then
+                currentRoot.CFrame = CFrame.new(nextPosition, nextPosition + flatLook.Unit)
+            else
+                currentRoot.CFrame = CFrame.new(nextPosition)
+            end
+        end
+    end)
+end
+
 toggleFlyButton.MouseButton1Click:Connect(function()
-    isFlying = not isFlying
     if isFlying then
-        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        toggleFlyButton.Text = "關閉自由飛行"
-        startFreeFly()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "3D 飛行已開啟",
-            Text = "推動搖桿/WASD 即朝視角方向飛行\n支援手機與電腦",
-            Duration = 3
-        })
-    else
-        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-        toggleFlyButton.Text = "開啟自由飛行"
         stopFreeFly()
+    else
+        startFreeFly()
+        if isFlying then
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "自由飛行已開啟",
+                Text = "前進會沿鏡頭中心的完整方向飛行；看天空即向上飛行",
+                Duration = 3
+            })
+        end
     end
 end)
 
--- 速度滑動條控制邏輯 (上限 400)
+-- 速度滑動條控制邏輯（上限 400）
 local isDraggingSlider = false
 local function updateSlider(inputX)
     local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
-    local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
+    local sliderFrameAbsoluteSizeX = math.max(flySpeedSliderFrame.AbsoluteSize.X, 1)
     local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
     local percentage = relativeX / sliderFrameAbsoluteSizeX
-
-    flySpeed = math.floor(percentage * 390) + 10 -- 10 到 400
+    flySpeed = math.floor(percentage * 390) + 10
     flySpeedLabel.Text = "飛行速度: " .. flySpeed
     flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
     flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
 end
 
 flySpeedSlider.MouseButton1Down:Connect(function() isDraggingSlider = true end)
-flySpeedSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true end end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = false
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+flySpeedSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSlider = true
         updateSlider(input.Position.X)
     end
 end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = false end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateSlider(input.Position.X) end
+end)
 
--- 面板切換
 flySettingsButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = false
     InfoPanel.Visible = false
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
+    if ESPPanel then ESPPanel.Visible = false end
     FlyPanel.Visible = true
     updatePanelStatus()
 end)
-
 flyBackButton.MouseButton1Click:Connect(function()
     FlyPanel.Visible = false
     MainPanel.Visible = true
     updatePanelStatus()
+end)
+Player.CharacterAdded:Connect(function()
+    if isFlying then task.wait(0.5); startFreeFly() end
 end)
 -- ========== 自由飛行功能代碼結束 ==========
 
