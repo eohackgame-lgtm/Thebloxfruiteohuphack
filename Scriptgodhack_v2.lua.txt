@@ -676,11 +676,12 @@ local function makePhysicalMover(part, velocityName, gyroName)
     return velocity, gyro
 end
 
--- 自動海上飛行：單一連線與安全清理，避免連續按鈕造成多重移動循環。
+-- 自動海上飛行：保留目前座位，以固定高度的小段傳送持續往角色／船體正前方移動。
 local isMoving = false
 local moveConnection = nil
-local SEA_FLY_SPEED = 300
+local SEA_FLY_SPEED = 180
 local SEA_FLY_HEIGHT = 180
+local SEA_FLY_MAX_STEP = 5
 
 local function stopSeaFly(showNotification)
     isMoving = false
@@ -709,19 +710,21 @@ local function startSeaFly()
         return
     end
 
-    -- 每次開始前先清理舊連線，避免速度疊加、卡住或位置跳動。
+    -- 不解除駕駛位；保留原本角色與船體的座位連結。
     stopSeaFly(false)
     isMoving = true
-
-    local startPosition = root.Position
-    root.CFrame = CFrame.new(startPosition.X, SEA_FLY_HEIGHT, startPosition.Z) * CFrame.Angles(0, math.rad(90), 0)
+    local initialPosition = root.Position
+    local initialForward = root.CFrame.LookVector
+    root.CFrame = CFrame.lookAt(
+        Vector3.new(initialPosition.X, SEA_FLY_HEIGHT, initialPosition.Z),
+        Vector3.new(initialPosition.X, SEA_FLY_HEIGHT, initialPosition.Z) + initialForward
+    )
 
     moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
         if not isMoving then
             stopSeaFly(false)
             return
         end
-
         local currentCharacter = Player.Character
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
         if not currentRoot then
@@ -729,14 +732,22 @@ local function startSeaFly()
             return
         end
 
+        -- 每幀只傳送一小段；方向取角色根部目前正前方，讓船頭朝哪裡就往哪裡。
+        local forward = currentRoot.CFrame.LookVector
+        local stepDistance = math.min(SEA_FLY_SPEED * deltaTime, SEA_FLY_MAX_STEP)
         local position = currentRoot.Position
-        local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
-        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
+        local nextPosition = Vector3.new(
+            position.X + forward.X * stepDistance,
+            SEA_FLY_HEIGHT,
+            position.Z + forward.Z * stepDistance
+        )
+        currentRoot.CFrame = CFrame.lookAt(nextPosition, nextPosition + forward)
+        currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     end)
 
     game.StarterGui:SetCore("SendNotification", {
         Title = "自動海上飛行",
-        Text = "已啟動，速度 300、高度 180",
+        Text = "已啟動：保持座位、固定高度、小段向前傳送",
         Duration = 3
     })
 end
@@ -745,7 +756,6 @@ teleportButton.MouseButton1Click:Connect(startSeaFly)
 stopButton.MouseButton1Click:Connect(function()
     stopSeaFly(true)
 end)
-
 Player.CharacterAdded:Connect(function()
     stopSeaFly(false)
 end)
