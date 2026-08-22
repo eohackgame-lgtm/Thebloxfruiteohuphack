@@ -638,7 +638,45 @@ flyBackCorner.Parent = flyBackButton
 
 
 
--- 自動海上飛行：單一連線與安全清理，避免連續按鈕造成多重移動循環。
+-- 船體／角色的物理移動輔助。
+local function getSeatedPhysicsPart(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local seat = humanoid and humanoid.SeatPart
+    if seat and seat:IsA("BasePart") then
+        return seat.AssemblyRootPart or seat, true
+    end
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    return root, false
+end
+
+local function destroyNamedMover(part, velocityName, gyroName)
+    if not part then return end
+    local velocity = part:FindFirstChild(velocityName)
+    local gyro = part:FindFirstChild(gyroName)
+    if velocity then velocity:Destroy() end
+    if gyro then gyro:Destroy() end
+end
+
+local function makePhysicalMover(part, velocityName, gyroName)
+    destroyNamedMover(part, velocityName, gyroName)
+    local velocity = Instance.new("BodyVelocity")
+    velocity.Name = velocityName
+    velocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    velocity.P = 18000
+    velocity.Velocity = Vector3.new(0, 0, 0)
+    velocity.Parent = part
+
+    local gyro = Instance.new("BodyGyro")
+    gyro.Name = gyroName
+    gyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    gyro.P = 120000
+    gyro.D = 1500
+    gyro.CFrame = part.CFrame
+    gyro.Parent = part
+    return velocity, gyro
+end
+
+-- 第一個自動海上飛行：穩定控制角色根部，不再對沒有控制權的船座施加無效速度。
 local isMoving = false
 local moveConnection = nil
 local SEA_FLY_SPEED = 300
@@ -646,10 +684,7 @@ local SEA_FLY_HEIGHT = 180
 
 local function stopSeaFly(showNotification)
     isMoving = false
-    if moveConnection then
-        moveConnection:Disconnect()
-        moveConnection = nil
-    end
+    if moveConnection then moveConnection:Disconnect(); moveConnection = nil end
     if showNotification then
         game.StarterGui:SetCore("SendNotification", {
             Title = "已停止",
@@ -661,8 +696,9 @@ end
 
 local function startSeaFly()
     local character = Player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then
+    if not humanoid or not root then
         game.StarterGui:SetCore("SendNotification", {
             Title = "自動海上飛行",
             Text = "找不到角色，請重生後再試",
@@ -671,46 +707,42 @@ local function startSeaFly()
         return
     end
 
-    -- 每次開始前先清理舊連線，避免速度疊加、卡住或位置跳動。
+    -- 人物坐在船座時先離座，避免座位約束將人物位置拉回船上。
+    if humanoid.SeatPart then
+        humanoid.Sit = false
+    end
     stopSeaFly(false)
     isMoving = true
-
-    local startPosition = root.Position
-    root.CFrame = CFrame.new(startPosition.X, SEA_FLY_HEIGHT, startPosition.Z) * CFrame.Angles(0, math.rad(90), 0)
+    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 
     moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
         if not isMoving then
             stopSeaFly(false)
             return
         end
-
         local currentCharacter = Player.Character
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
         if not currentRoot then
             stopSeaFly(false)
             return
         end
-
         local position = currentRoot.Position
-        local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
-        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
+        -- 錄影確認原本負 X 軸方向與船頭方向相反，改為正 X 軸與反向 yaw。
+        local nextPosition = Vector3.new(position.X + SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
+        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(-90), 0)
+        currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     end)
 
     game.StarterGui:SetCore("SendNotification", {
         Title = "自動海上飛行",
-        Text = "已啟動，速度 300、高度 180",
+        Text = "已啟動：人物沿海面方向飛行",
         Duration = 3
     })
 end
 
 teleportButton.MouseButton1Click:Connect(startSeaFly)
-stopButton.MouseButton1Click:Connect(function()
-    stopSeaFly(true)
-end)
-
-Player.CharacterAdded:Connect(function()
-    stopSeaFly(false)
-end)
+stopButton.MouseButton1Click:Connect(function() stopSeaFly(true) end)
+Player.CharacterAdded:Connect(function() stopSeaFly(false) end)
 
 -- 信息按钮功能
 infoButton.MouseButton1Click:Connect(function()
@@ -1027,38 +1059,25 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始（完整相機視角版） ==========
+-- ========== 自由飛行功能代碼開始（人物全視角版） ==========
 local UserInputService = game:GetService("UserInputService")
 local ControlModule = nil
 pcall(function()
     ControlModule = require(Player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
 end)
 
--- 顯示「目前狀態」，避免按鈕文字與顏色被理解為相反含義。
+local freeFlyPart = nil
 toggleFlyButton.Text = "自由飛行：已關閉"
 toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
 
-local function clearFlyObjects(root)
-    if not root then return end
-    local velocity = root:FindFirstChild("FlyVelocity")
-    local gyro = root:FindFirstChild("FlyGyro")
-    if velocity then velocity:Destroy() end
-    if gyro then gyro:Destroy() end
-end
-
 local function getRawFlyInput(humanoid)
     local input = Vector3.new(0, 0, 0)
-    if ControlModule then
-        pcall(function() input = ControlModule:GetMoveVector() end)
-    end
-    -- 部分手機控制器在特殊狀態下不回傳 ControlModule 向量，使用原生移動方向作為備援。
+    if ControlModule then pcall(function() input = ControlModule:GetMoveVector() end) end
     if input.Magnitude < 0.01 and humanoid then
         local worldMove = humanoid.MoveDirection
-        if worldMove.Magnitude > 0.01 then
-            local camera = workspace.CurrentCamera
-            if camera then
-                input = Vector3.new(worldMove:Dot(camera.CFrame.RightVector), 0, -worldMove:Dot(camera.CFrame.LookVector))
-            end
+        local camera = workspace.CurrentCamera
+        if worldMove.Magnitude > 0.01 and camera then
+            input = Vector3.new(worldMove:Dot(camera.CFrame.RightVector), 0, -worldMove:Dot(camera.CFrame.LookVector))
         end
     end
     return input
@@ -1066,18 +1085,10 @@ end
 
 local function stopFreeFly()
     isFlying = false
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
-
-    local character = Player.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if root then
-        root.Anchored = false
-        clearFlyObjects(root)
-    end
+    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
+    destroyNamedMover(freeFlyPart, "FreeFlyVelocity", "FreeFlyGyro")
+    freeFlyPart = nil
+    local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
     if humanoid then
         humanoid.PlatformStand = false
         humanoid.AutoRotate = true
@@ -1087,7 +1098,6 @@ local function stopFreeFly()
 end
 
 local function startFreeFly()
-    -- 防止重複連線；並在每次開啟時讀取目前角色與相機。
     if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
     local character = Player.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -1097,15 +1107,26 @@ local function startFreeFly()
         return
     end
 
-    clearFlyObjects(root)
+    -- 此指定版本僅控制人物；若在座位上，先離座再以人物本體飛行。
+    local wasSeated = humanoid.SeatPart ~= nil
+    if wasSeated then
+        humanoid.Sit = false
+        task.wait()
+    end
+    character = Player.Character
+    humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    root = character and character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return end
+
     isFlying = true
-    root.Anchored = true
-    humanoid.PlatformStand = false
+    freeFlyPart = root
+    local velocity, gyro = makePhysicalMover(root, "FreeFlyVelocity", "FreeFlyGyro")
+    humanoid.PlatformStand = true
     humanoid.AutoRotate = false
     toggleFlyButton.Text = "自由飛行：已開啟"
     toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 
-    flyConnection = RunService.RenderStepped:Connect(function(deltaTime)
+    flyConnection = RunService.Heartbeat:Connect(function()
         local currentCharacter = Player.Character
         local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
@@ -1114,61 +1135,46 @@ local function startFreeFly()
             stopFreeFly()
             return
         end
-
-        local moveInput = getRawFlyInput(currentHumanoid)
-        local forwardAmount = -moveInput.Z
-        local sideAmount = moveInput.X
-
-        -- 關鍵：前後方向直接使用相機完整 LookVector（包含 Y 軸）。
-        -- 因此鏡頭指向天空時，前進會真正向天空位移；指向地面則向下位移。
-        local desiredDirection = camera.CFrame.LookVector * forwardAmount + camera.CFrame.RightVector * sideAmount
-        if desiredDirection.Magnitude > 0.01 then
-            local nextPosition = currentRoot.Position + desiredDirection.Unit * flySpeed * deltaTime
-            -- 角色只採用相機的水平朝向，避免模型跟著上下翻轉；移動本身仍是完整 3D。
-            local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
-            if flatLook.Magnitude > 0.01 then
-                currentRoot.CFrame = CFrame.new(nextPosition, nextPosition + flatLook.Unit)
-            else
-                currentRoot.CFrame = CFrame.new(nextPosition)
-            end
+        if currentRoot ~= freeFlyPart then
+            destroyNamedMover(freeFlyPart, "FreeFlyVelocity", "FreeFlyGyro")
+            freeFlyPart = currentRoot
+            velocity, gyro = makePhysicalMover(currentRoot, "FreeFlyVelocity", "FreeFlyGyro")
         end
+
+        local input = getRawFlyInput(currentHumanoid)
+        local look = camera.CFrame.LookVector
+        -- 完整相機方向，且朝天空時垂直分量提高為三倍。
+        local direction = Vector3.new(look.X, look.Y * 3, look.Z) * (-input.Z) + camera.CFrame.RightVector * input.X
+        velocity.Velocity = direction.Magnitude > 0.01 and direction.Unit * flySpeed or Vector3.new(0, 0, 0)
+        -- 人物身體依完整視角轉向。
+        gyro.CFrame = CFrame.lookAt(freeFlyPart.Position, freeFlyPart.Position + look)
     end)
+
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "自由飛行已開啟",
+        Text = wasSeated and "已離開座位後使用人物飛行" or "人物全視角飛行已開啟",
+        Duration = 3
+    })
 end
 
 toggleFlyButton.MouseButton1Click:Connect(function()
-    if isFlying then
-        stopFreeFly()
-    else
-        startFreeFly()
-        if isFlying then
-            game.StarterGui:SetCore("SendNotification", {
-                Title = "自由飛行已開啟",
-                Text = "前進會沿鏡頭中心的完整方向飛行；看天空即向上飛行",
-                Duration = 3
-            })
-        end
-    end
+    if isFlying then stopFreeFly() else startFreeFly() end
 end)
 
 -- 速度滑動條控制邏輯（上限 400）
 local isDraggingSlider = false
 local function updateSlider(inputX)
-    local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
-    local sliderFrameAbsoluteSizeX = math.max(flySpeedSliderFrame.AbsoluteSize.X, 1)
-    local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
-    local percentage = relativeX / sliderFrameAbsoluteSizeX
+    local startX = flySpeedSliderFrame.AbsolutePosition.X
+    local width = math.max(flySpeedSliderFrame.AbsoluteSize.X, 1)
+    local percentage = math.clamp((inputX - startX) / width, 0, 1)
     flySpeed = math.floor(percentage * 390) + 10
     flySpeedLabel.Text = "飛行速度: " .. flySpeed
     flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
     flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
 end
-
 flySpeedSlider.MouseButton1Down:Connect(function() isDraggingSlider = true end)
 flySpeedSlider.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        isDraggingSlider = true
-        updateSlider(input.Position.X)
-    end
+    if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true; updateSlider(input.Position.X) end
 end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = false end
