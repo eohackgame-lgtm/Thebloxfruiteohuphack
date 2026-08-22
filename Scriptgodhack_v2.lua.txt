@@ -13,6 +13,7 @@ if not Player then
 end
 
 local PlayerGui = Player:WaitForChild("PlayerGui")
+local ESPPanel = nil
 
 -- 顯示通知（加載時自動顯示）
 game.StarterGui:SetCore("SendNotification", {
@@ -278,7 +279,7 @@ local flyToTikiButton  = makeMainButton("飛到 Tiki 島",  Color3.fromRGB(180, 
 local espFruitButton   = makeMainButton("ESP 果實",      Color3.fromRGB(220, 130, 50))
 local speedButton      = makeMainButton("速度設置",      Color3.fromRGB(100, 180, 255))
 local autoBattleButton = makeMainButton("自動攻擊設置",  Color3.fromRGB(220, 150, 80))
-local espButton        = makeMainButton("ESP 玩家 開啟", Color3.fromRGB(180, 80, 200))
+local espButton        = makeMainButton("ESP 玩家設定", Color3.fromRGB(180, 80, 200))
 local infoButton       = makeMainButton("顯示信息",      Color3.fromRGB(80, 120, 200))
 local flySettingsButton = makeMainButton("飛行設置",      Color3.fromRGB(150, 100, 255))
 
@@ -1080,10 +1081,14 @@ local function startFreeFly()
         -- 旋轉：始終面向相機方向
         bg.CFrame = cameraCFrame
 
-        -- 計算 3D 飛行方向
-        -- 前後移動使用 Camera.LookVector (Z 是反向的，所以用 -moveVector.Z)
-        -- 左右移動使用 Camera.RightVector
-        local direction = (cameraCFrame.LookVector * -moveVector.Z) + (cameraCFrame.RightVector * moveVector.X)
+        -- 計算 3D 飛行方向：前進沿相機視角；鏡頭朝上時額外提高上升比例。
+        local forwardInput = -moveVector.Z
+        local forwardDirection = cameraCFrame.LookVector * forwardInput
+        if forwardInput > 0 and cameraCFrame.LookVector.Y > 0 then
+            -- 保留「看向哪裡就飛向哪裡」，但讓抬頭前進的垂直分量更明顯。
+            forwardDirection = forwardDirection + Vector3.new(0, cameraCFrame.LookVector.Y * forwardInput * 1.25, 0)
+        end
+        local direction = forwardDirection + (cameraCFrame.RightVector * moveVector.X)
         
         if direction.Magnitude > 0 then
             bv.Velocity = direction.Unit * flySpeed
@@ -1276,7 +1281,10 @@ local function updatePanelStatus()
     elseif BattlePanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
         IconButton.BackgroundTransparency = 0
-        elseif FlyPanel.Visible then
+    elseif ESPPanel and ESPPanel.Visible then
+        IconButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+        IconButton.BackgroundTransparency = 0
+    elseif FlyPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(150, 100, 255)
         IconButton.BackgroundTransparency = 0
     elseif SpeedPanel.Visible then
@@ -1290,103 +1298,289 @@ end
 
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible then
+    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible or (ESPPanel and ESPPanel.Visible) then
         MainPanel.Visible = false
         InfoPanel.Visible = false
         BattlePanel.Visible = false
         SpeedPanel.Visible = false
         FlyPanel.Visible = false
+        if ESPPanel then ESPPanel.Visible = false end
     else
         MainPanel.Visible = true
     end
     updatePanelStatus()
 end)
 
--- ========== ESP 玩家功能 ==========
+-- ========== ESP 玩家設定功能 ==========
 local espEnabled = false
+local ESPSettings = {
+    Level = false,
+    Distance = false,
+    Health = false,
+    Order = {}
+}
 local espFolder = Instance.new("Folder")
 espFolder.Name = "ESPFolder"
 espFolder.Parent = workspace
+local espConnections = {}
+
+ESPPanel = Instance.new("Frame")
+ESPPanel.Name = "ESPPanel"
+ESPPanel.Size = UDim2.new(0, 300, 0, 390)
+ESPPanel.Position = UDim2.new(0, 90, 0, 20)
+ESPPanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+ESPPanel.BackgroundTransparency = 0.1
+ESPPanel.Visible = false
+ESPPanel.Parent = ScreenGui
+Instance.new("UICorner", ESPPanel).CornerRadius = UDim.new(0, 12)
+
+local espPanelTitle = Instance.new("TextLabel")
+espPanelTitle.Size = UDim2.new(0, 260, 0, 35)
+espPanelTitle.Position = UDim2.new(0, 20, 0, 10)
+espPanelTitle.BackgroundTransparency = 1
+espPanelTitle.Text = "ESP 玩家設定"
+espPanelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+espPanelTitle.TextScaled = true
+espPanelTitle.Font = Enum.Font.GothamBold
+espPanelTitle.Parent = ESPPanel
+
+local espToggleButton = Instance.new("TextButton")
+espToggleButton.Size = UDim2.new(0, 260, 0, 40)
+espToggleButton.Position = UDim2.new(0, 20, 0, 55)
+espToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+espToggleButton.Text = "ESP 玩家：關閉"
+espToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+espToggleButton.TextScaled = true
+espToggleButton.Parent = ESPPanel
+Instance.new("UICorner", espToggleButton).CornerRadius = UDim.new(0, 8)
+
+local levelToggleButton = Instance.new("TextButton")
+levelToggleButton.Size = UDim2.new(0, 260, 0, 40)
+levelToggleButton.Position = UDim2.new(0, 20, 0, 105)
+levelToggleButton.BackgroundColor3 = Color3.fromRGB(80, 110, 160)
+levelToggleButton.Text = "顯示等級：關閉"
+levelToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+levelToggleButton.TextScaled = true
+levelToggleButton.Parent = ESPPanel
+Instance.new("UICorner", levelToggleButton).CornerRadius = UDim.new(0, 8)
+
+local distanceToggleButton = Instance.new("TextButton")
+distanceToggleButton.Size = UDim2.new(0, 260, 0, 40)
+distanceToggleButton.Position = UDim2.new(0, 20, 0, 155)
+distanceToggleButton.BackgroundColor3 = Color3.fromRGB(80, 110, 160)
+distanceToggleButton.Text = "顯示距離：關閉"
+distanceToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+distanceToggleButton.TextScaled = true
+distanceToggleButton.Parent = ESPPanel
+Instance.new("UICorner", distanceToggleButton).CornerRadius = UDim.new(0, 8)
+
+local healthToggleButton = Instance.new("TextButton")
+healthToggleButton.Size = UDim2.new(0, 260, 0, 40)
+healthToggleButton.Position = UDim2.new(0, 20, 0, 205)
+healthToggleButton.BackgroundColor3 = Color3.fromRGB(80, 110, 160)
+healthToggleButton.Text = "顯示血量：關閉"
+healthToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+healthToggleButton.TextScaled = true
+healthToggleButton.Parent = ESPPanel
+Instance.new("UICorner", healthToggleButton).CornerRadius = UDim.new(0, 8)
+
+local espOrderHint = Instance.new("TextLabel")
+espOrderHint.Size = UDim2.new(0, 260, 0, 42)
+espOrderHint.Position = UDim2.new(0, 20, 0, 255)
+espOrderHint.BackgroundTransparency = 1
+espOrderHint.Text = "名稱固定在最上方；其餘內容依開啟順序排列"
+espOrderHint.TextColor3 = Color3.fromRGB(210, 210, 210)
+espOrderHint.TextScaled = true
+espOrderHint.TextWrapped = true
+espOrderHint.Font = Enum.Font.Gotham
+espOrderHint.Parent = ESPPanel
+
+local espBackButton = Instance.new("TextButton")
+espBackButton.Size = UDim2.new(0, 260, 0, 40)
+espBackButton.Position = UDim2.new(0, 20, 0, 325)
+espBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
+espBackButton.Text = "返回主頁"
+espBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+espBackButton.TextScaled = true
+espBackButton.Parent = ESPPanel
+Instance.new("UICorner", espBackButton).CornerRadius = UDim.new(0, 8)
 
 local function getPlayerLevel(targetPlayer)
     local ok, level = pcall(function() return targetPlayer.Data.Level.Value end)
-    if ok and level then return tostring(level) end
-    return "?"
+    return (ok and level) and tostring(level) or "?"
+end
+
+local function getDistanceText(targetPlayer)
+    local ownRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not ownRoot or not targetRoot then return "距離：?" end
+    return "距離：" .. tostring(math.floor((targetRoot.Position - ownRoot.Position).Magnitude + 0.5))
+end
+
+local function getHealthText(targetPlayer)
+    local humanoid = targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return "血量：?" end
+    return "血量：" .. tostring(math.floor(humanoid.Health + 0.5)) .. "/" .. tostring(math.floor(humanoid.MaxHealth + 0.5))
+end
+
+local function renderESPLayout(targetPlayer, billboard)
+    local content = billboard:FindFirstChild("Content")
+    if not content then return end
+    content:ClearAllChildren()
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 1)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.Parent = content
+
+    local function addLine(name, text, color, bold)
+        local line = Instance.new("TextLabel")
+        line.Name = name
+        line.Size = UDim2.new(1, 0, 0, 20)
+        line.BackgroundTransparency = 1
+        line.Text = text
+        line.TextColor3 = color
+        line.TextScaled = true
+        line.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
+        line.TextStrokeTransparency = 0
+        line.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        line.Parent = content
+        return line
+    end
+
+    addLine("NameLine", targetPlayer.Name, Color3.fromRGB(255, 255, 100), true)
+    for _, key in ipairs(ESPSettings.Order) do
+        if key == "Level" and ESPSettings.Level then
+            addLine("LevelLine", "Lv. " .. getPlayerLevel(targetPlayer), Color3.fromRGB(100, 220, 255), false)
+        elseif key == "Distance" and ESPSettings.Distance then
+            addLine("DistanceLine", getDistanceText(targetPlayer), Color3.fromRGB(150, 255, 150), false)
+        elseif key == "Health" and ESPSettings.Health then
+            addLine("HealthLine", getHealthText(targetPlayer), Color3.fromRGB(255, 130, 130), false)
+        end
+    end
+
+    billboard.Size = UDim2.new(0, 180, 0, 22 + (#ESPSettings.Order * 21))
+end
+
+local function updateESPValues(targetPlayer, billboard)
+    local character = targetPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if root then billboard.Adornee = root end
+    local content = billboard:FindFirstChild("Content")
+    if not content then return end
+    local levelLine = content:FindFirstChild("LevelLine")
+    local distanceLine = content:FindFirstChild("DistanceLine")
+    local healthLine = content:FindFirstChild("HealthLine")
+    if levelLine then levelLine.Text = "Lv. " .. getPlayerLevel(targetPlayer) end
+    if distanceLine then distanceLine.Text = getDistanceText(targetPlayer) end
+    if healthLine then healthLine.Text = getHealthText(targetPlayer) end
 end
 
 local function createESP(targetPlayer)
-    if espFolder:FindFirstChild(targetPlayer.Name) then return end
+    if targetPlayer == Player or espFolder:FindFirstChild(targetPlayer.Name) then return end
     local billboard = Instance.new("BillboardGui")
     billboard.Name = targetPlayer.Name
-    billboard.Size = UDim2.new(0, 160, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.AlwaysOnTop = true
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.Parent = espFolder
 
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
-    nameLabel.TextScaled = true
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.Text = targetPlayer.Name
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    nameLabel.Parent = billboard
+    local content = Instance.new("Frame")
+    content.Name = "Content"
+    content.Size = UDim2.new(1, 0, 1, 0)
+    content.BackgroundTransparency = 1
+    content.Parent = billboard
+    renderESPLayout(targetPlayer, billboard)
+    updateESPValues(targetPlayer, billboard)
 
-    local levelLabel = Instance.new("TextLabel")
-    levelLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    levelLabel.Position = UDim2.new(0, 0, 0.5, 0)
-    levelLabel.BackgroundTransparency = 1
-    levelLabel.TextColor3 = Color3.fromRGB(100, 220, 255)
-    levelLabel.TextScaled = true
-    levelLabel.Font = Enum.Font.Gotham
-    levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
-    levelLabel.TextStrokeTransparency = 0
-    levelLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    levelLabel.Parent = billboard
-
-    local updateConn
-    updateConn = RunService.Heartbeat:Connect(function()
-        if not espEnabled or not targetPlayer or not targetPlayer.Parent then
-            billboard:Destroy()
-            updateConn:Disconnect()
+    espConnections[targetPlayer] = RunService.Heartbeat:Connect(function()
+        if not espEnabled or not targetPlayer.Parent or not billboard.Parent then
+            if espConnections[targetPlayer] then espConnections[targetPlayer]:Disconnect(); espConnections[targetPlayer] = nil end
+            if billboard.Parent then billboard:Destroy() end
             return
         end
-        local char = targetPlayer.Character
-        if char then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp then billboard.Adornee = hrp end
-        end
-        levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
+        updateESPValues(targetPlayer, billboard)
     end)
 end
 
 local function clearAllESP()
-    for _, v in ipairs(espFolder:GetChildren()) do v:Destroy() end
+    for targetPlayer, connection in pairs(espConnections) do
+        connection:Disconnect()
+        espConnections[targetPlayer] = nil
+    end
+    for _, billboard in ipairs(espFolder:GetChildren()) do billboard:Destroy() end
 end
 
 local function buildAllESP()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= Player then createESP(p) end
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do createESP(targetPlayer) end
+end
+
+local function updateAllESPLayouts()
+    if not espEnabled then return end
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        local billboard = espFolder:FindFirstChild(targetPlayer.Name)
+        if billboard then renderESPLayout(targetPlayer, billboard); updateESPValues(targetPlayer, billboard) end
     end
 end
 
-Players.PlayerAdded:Connect(function(p)
-    if espEnabled then createESP(p) end
-end)
+local function updateExtraButton(button, label, enabled)
+    button.Text = label .. (enabled and "：開啟" or "：關閉")
+    button.BackgroundColor3 = enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(80, 110, 160)
+end
+
+local function toggleExtra(key, button, label)
+    ESPSettings[key] = not ESPSettings[key]
+    if ESPSettings[key] then
+        local exists = false
+        for _, value in ipairs(ESPSettings.Order) do if value == key then exists = true break end end
+        if not exists then table.insert(ESPSettings.Order, key) end
+    else
+        for index, value in ipairs(ESPSettings.Order) do
+            if value == key then table.remove(ESPSettings.Order, index); break end
+        end
+    end
+    updateExtraButton(button, label, ESPSettings[key])
+    updateAllESPLayouts()
+end
 
 espButton.MouseButton1Click:Connect(function()
+    MainPanel.Visible = false
+    InfoPanel.Visible = false
+    BattlePanel.Visible = false
+    SpeedPanel.Visible = false
+    FlyPanel.Visible = false
+    ESPPanel.Visible = true
+    updatePanelStatus()
+end)
+
+espToggleButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     if espEnabled then
-        espButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        espButton.Text = "ESP 玩家 關閉"
+        espToggleButton.Text = "ESP 玩家：開啟"
+        espToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
         buildAllESP()
     else
-        espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-        espButton.Text = "ESP 玩家 開啟"
+        espToggleButton.Text = "ESP 玩家：關閉"
+        espToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
         clearAllESP()
     end
+end)
+levelToggleButton.MouseButton1Click:Connect(function() toggleExtra("Level", levelToggleButton, "顯示等級") end)
+distanceToggleButton.MouseButton1Click:Connect(function() toggleExtra("Distance", distanceToggleButton, "顯示距離") end)
+healthToggleButton.MouseButton1Click:Connect(function() toggleExtra("Health", healthToggleButton, "顯示血量") end)
+espBackButton.MouseButton1Click:Connect(function()
+    ESPPanel.Visible = false
+    MainPanel.Visible = true
+    updatePanelStatus()
+end)
+
+Players.PlayerAdded:Connect(function(targetPlayer)
+    if espEnabled then createESP(targetPlayer) end
+end)
+Players.PlayerRemoving:Connect(function(targetPlayer)
+    local connection = espConnections[targetPlayer]
+    if connection then connection:Disconnect(); espConnections[targetPlayer] = nil end
+    local billboard = espFolder:FindFirstChild(targetPlayer.Name)
+    if billboard then billboard:Destroy() end
 end)
 -- ========== ESP 玩家功能結束 ==========
 
