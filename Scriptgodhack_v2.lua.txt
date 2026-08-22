@@ -13,7 +13,6 @@ if not Player then
 end
 
 local PlayerGui = Player:WaitForChild("PlayerGui")
-local ESPPanel = nil
 
 -- 顯示通知（加載時自動顯示）
 game.StarterGui:SetCore("SendNotification", {
@@ -279,7 +278,7 @@ local flyToTikiButton  = makeMainButton("飛到 Tiki 島",  Color3.fromRGB(180, 
 local espFruitButton   = makeMainButton("ESP 果實",      Color3.fromRGB(220, 130, 50))
 local speedButton      = makeMainButton("速度設置",      Color3.fromRGB(100, 180, 255))
 local autoBattleButton = makeMainButton("自動攻擊設置",  Color3.fromRGB(220, 150, 80))
-local espButton        = makeMainButton("ESP 玩家設定", Color3.fromRGB(180, 80, 200))
+local espButton        = makeMainButton("ESP 玩家 開啟", Color3.fromRGB(180, 80, 200))
 local infoButton       = makeMainButton("顯示信息",      Color3.fromRGB(80, 120, 200))
 local flySettingsButton = makeMainButton("飛行設置",      Color3.fromRGB(150, 100, 255))
 
@@ -638,45 +637,7 @@ flyBackCorner.Parent = flyBackButton
 
 
 
--- 船體／角色的物理移動輔助。
-local function getSeatedPhysicsPart(character)
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    local seat = humanoid and humanoid.SeatPart
-    if seat and seat:IsA("BasePart") then
-        return seat.AssemblyRootPart or seat, true
-    end
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    return root, false
-end
-
-local function destroyNamedMover(part, velocityName, gyroName)
-    if not part then return end
-    local velocity = part:FindFirstChild(velocityName)
-    local gyro = part:FindFirstChild(gyroName)
-    if velocity then velocity:Destroy() end
-    if gyro then gyro:Destroy() end
-end
-
-local function makePhysicalMover(part, velocityName, gyroName)
-    destroyNamedMover(part, velocityName, gyroName)
-    local velocity = Instance.new("BodyVelocity")
-    velocity.Name = velocityName
-    velocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    velocity.P = 18000
-    velocity.Velocity = Vector3.new(0, 0, 0)
-    velocity.Parent = part
-
-    local gyro = Instance.new("BodyGyro")
-    gyro.Name = gyroName
-    gyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    gyro.P = 120000
-    gyro.D = 1500
-    gyro.CFrame = part.CFrame
-    gyro.Parent = part
-    return velocity, gyro
-end
-
--- 第一個自動海上飛行：穩定控制角色根部，不再對沒有控制權的船座施加無效速度。
+-- 自動海上飛行：單一連線與安全清理，避免連續按鈕造成多重移動循環。
 local isMoving = false
 local moveConnection = nil
 local SEA_FLY_SPEED = 300
@@ -684,7 +645,10 @@ local SEA_FLY_HEIGHT = 180
 
 local function stopSeaFly(showNotification)
     isMoving = false
-    if moveConnection then moveConnection:Disconnect(); moveConnection = nil end
+    if moveConnection then
+        moveConnection:Disconnect()
+        moveConnection = nil
+    end
     if showNotification then
         game.StarterGui:SetCore("SendNotification", {
             Title = "已停止",
@@ -696,9 +660,8 @@ end
 
 local function startSeaFly()
     local character = Player.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not root then
+    if not root then
         game.StarterGui:SetCore("SendNotification", {
             Title = "自動海上飛行",
             Text = "找不到角色，請重生後再試",
@@ -707,42 +670,46 @@ local function startSeaFly()
         return
     end
 
-    -- 人物坐在船座時先離座，避免座位約束將人物位置拉回船上。
-    if humanoid.SeatPart then
-        humanoid.Sit = false
-    end
+    -- 每次開始前先清理舊連線，避免速度疊加、卡住或位置跳動。
     stopSeaFly(false)
     isMoving = true
-    root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+
+    local startPosition = root.Position
+    root.CFrame = CFrame.new(startPosition.X, SEA_FLY_HEIGHT, startPosition.Z) * CFrame.Angles(0, math.rad(90), 0)
 
     moveConnection = RunService.Heartbeat:Connect(function(deltaTime)
         if not isMoving then
             stopSeaFly(false)
             return
         end
+
         local currentCharacter = Player.Character
         local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
         if not currentRoot then
             stopSeaFly(false)
             return
         end
+
         local position = currentRoot.Position
-        -- 錄影確認原本負 X 軸方向與船頭方向相反，改為正 X 軸與反向 yaw。
-        local nextPosition = Vector3.new(position.X + SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
-        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(-90), 0)
-        currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        local nextPosition = Vector3.new(position.X - SEA_FLY_SPEED * deltaTime, SEA_FLY_HEIGHT, position.Z)
+        currentRoot.CFrame = CFrame.new(nextPosition) * CFrame.Angles(0, math.rad(90), 0)
     end)
 
     game.StarterGui:SetCore("SendNotification", {
         Title = "自動海上飛行",
-        Text = "已啟動：人物沿海面方向飛行",
+        Text = "已啟動，速度 300、高度 180",
         Duration = 3
     })
 end
 
 teleportButton.MouseButton1Click:Connect(startSeaFly)
-stopButton.MouseButton1Click:Connect(function() stopSeaFly(true) end)
-Player.CharacterAdded:Connect(function() stopSeaFly(false) end)
+stopButton.MouseButton1Click:Connect(function()
+    stopSeaFly(true)
+end)
+
+Player.CharacterAdded:Connect(function()
+    stopSeaFly(false)
+end)
 
 -- 信息按钮功能
 infoButton.MouseButton1Click:Connect(function()
@@ -1059,160 +1026,155 @@ confirmSpeedButton.MouseButton1Click:Connect(function()
 end)
 -- ========== 速度控制功能代碼結束 ==========
 
--- ========== 自由飛行功能代碼開始（坐船同步全視角版） ==========
+-- ========== 自由飛行功能代碼開始 (跨平台 3D 視角連動版) ==========
 local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+-- 獲取 Roblox 控制模組以支援手機搖桿和電腦鍵盤的原始輸入
 local ControlModule = nil
 pcall(function()
     ControlModule = require(Player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
 end)
 
-local freeFlyPart = nil
-local freeFlyWasSeated = false
-toggleFlyButton.Text = "自由飛行：已關閉"
-toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+local function startFreeFly()
+    if not Player.Character or not Player.Character:FindFirstChildOfClass("Humanoid") or not Player.Character:FindFirstChild("HumanoidRootPart") then return end
 
-local function getRawFlyInput(humanoid)
-    local input = Vector3.new(0, 0, 0)
-    if ControlModule then pcall(function() input = ControlModule:GetMoveVector() end) end
-    if input.Magnitude < 0.01 and humanoid then
-        local worldMove = humanoid.MoveDirection
-        local camera = workspace.CurrentCamera
-        if worldMove.Magnitude > 0.01 and camera then
-            input = Vector3.new(worldMove:Dot(camera.CFrame.RightVector), 0, -worldMove:Dot(camera.CFrame.LookVector))
+    local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+    local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+
+    -- 清除舊組件
+    if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+    if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "FlyVelocity"
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = hrp
+
+    local bg = Instance.new("BodyGyro")
+    bg.Name = "FlyGyro"
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P = 9e4
+    bg.CFrame = hrp.CFrame
+    bg.Parent = hrp
+
+    humanoid.PlatformStand = true
+
+    flyConnection = RunService.Heartbeat:Connect(function()
+        if not isFlying or not Player.Character or not hrp or not humanoid then
+            if flyConnection then flyConnection:Disconnect() end
+            flyConnection = nil
+            return
         end
-    end
-    return input
+
+        local cameraCFrame = Camera.CFrame
+        
+        -- 獲取原始移動向量 (X: 左右, Z: 前後, Y: 跳躍/上升)
+        -- 在 Roblox 控制中，Z = -1 是前進，Z = 1 是後退
+        local moveVector = Vector3.new(0,0,0)
+        if ControlModule then
+            moveVector = ControlModule:GetMoveVector()
+        end
+        
+        -- 旋轉：始終面向相機方向
+        bg.CFrame = cameraCFrame
+
+        -- 計算 3D 飛行方向
+        -- 前後移動使用 Camera.LookVector (Z 是反向的，所以用 -moveVector.Z)
+        -- 左右移動使用 Camera.RightVector
+        local direction = (cameraCFrame.LookVector * -moveVector.Z) + (cameraCFrame.RightVector * moveVector.X)
+        
+        if direction.Magnitude > 0 then
+            bv.Velocity = direction.Unit * flySpeed
+        else
+            -- 沒有輸入時保持靜止懸浮，給予極小向上力防止物理引擎下沉
+            bv.Velocity = Vector3.new(0, 0.1, 0)
+        end
+    end)
 end
 
 local function stopFreeFly()
     isFlying = false
-    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
-    destroyNamedMover(freeFlyPart, "FreeFlyVelocity", "FreeFlyGyro")
-    freeFlyPart = nil
-    local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.PlatformStand = false
-        humanoid.AutoRotate = true
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
     end
-    toggleFlyButton.Text = "自由飛行：已關閉"
-    toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+    if Player.Character then
+        local hrp = Player.Character:FindFirstChild("HumanoidRootPart")
+        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+        if hrp then
+            if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+            if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+        end
+        if humanoid then
+            humanoid.PlatformStand = false
+        end
+    end
 end
 
-local function startFreeFly()
-    if flyConnection then flyConnection:Disconnect(); flyConnection = nil end
-    local character = Player.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not root then
-        isFlying = false
-        return
-    end
-
-    isFlying = true
-    freeFlyPart = root
-    freeFlyWasSeated = humanoid.SeatPart ~= nil
-    local velocity, gyro = nil, nil
-    if not freeFlyWasSeated then
-        velocity, gyro = makePhysicalMover(root, "FreeFlyVelocity", "FreeFlyGyro")
-        humanoid.PlatformStand = true
-    else
-        -- 保留駕駛座；座位焊接會把船與角色根部同步，勿在此離座。
-        humanoid.PlatformStand = false
-    end
-    humanoid.AutoRotate = false
-    toggleFlyButton.Text = "自由飛行：已開啟"
-    toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-
-    flyConnection = RunService.Heartbeat:Connect(function(deltaTime)
-        local currentCharacter = Player.Character
-        local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
-        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
-        local camera = workspace.CurrentCamera
-        if not isFlying or not currentHumanoid or not currentRoot or not camera then
-            stopFreeFly()
-            return
-        end
-
-        local seatedNow = currentHumanoid.SeatPart ~= nil
-        if currentRoot ~= freeFlyPart or seatedNow ~= freeFlyWasSeated then
-            destroyNamedMover(freeFlyPart, "FreeFlyVelocity", "FreeFlyGyro")
-            freeFlyPart = currentRoot
-            freeFlyWasSeated = seatedNow
-            velocity, gyro = nil, nil
-            if not seatedNow then
-                velocity, gyro = makePhysicalMover(currentRoot, "FreeFlyVelocity", "FreeFlyGyro")
-                currentHumanoid.PlatformStand = true
-            else
-                currentHumanoid.PlatformStand = false
-            end
-        end
-
-        local input = getRawFlyInput(currentHumanoid)
-        local look = camera.CFrame.LookVector
-        -- 坐船與未坐船都使用相同完整視角向量；抬頭時 Y 權重提高。
-        local desired = Vector3.new(look.X, look.Y * 3, look.Z) * (-input.Z) + camera.CFrame.RightVector * input.X
-        if freeFlyWasSeated then
-            -- 錄影顯示角色根部的 CFrame 移動能帶動目前船座約束下的船體。
-            if desired.Magnitude > 0.01 then
-                local nextPosition = currentRoot.Position + desired.Unit * flySpeed * deltaTime
-                currentRoot.CFrame = CFrame.lookAt(nextPosition, nextPosition + look)
-                currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-            end
-        else
-            velocity.Velocity = desired.Magnitude > 0.01 and desired.Unit * flySpeed or Vector3.new(0, 0, 0)
-            gyro.CFrame = CFrame.lookAt(freeFlyPart.Position, freeFlyPart.Position + look)
-        end
-    end)
-
-    game.StarterGui:SetCore("SendNotification", {
-        Title = "自由飛行已開啟",
-        Text = freeFlyWasSeated and "保留駕駛座並同步船體移動" or "人物物理飛行：抬頭前進會大幅上升",
-        Duration = 3
-    })
-end
-
+-- 飛行按鈕點擊事件
 toggleFlyButton.MouseButton1Click:Connect(function()
-    if isFlying then stopFreeFly() else startFreeFly() end
+    isFlying = not isFlying
+    if isFlying then
+        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        toggleFlyButton.Text = "關閉自由飛行"
+        startFreeFly()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "3D 飛行已開啟",
+            Text = "推動搖桿/WASD 即朝視角方向飛行\n支援手機與電腦",
+            Duration = 3
+        })
+    else
+        toggleFlyButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        toggleFlyButton.Text = "開啟自由飛行"
+        stopFreeFly()
+    end
 end)
 
--- 速度滑動條控制邏輯（上限 400）
+-- 速度滑動條控制邏輯 (上限 400)
 local isDraggingSlider = false
 local function updateSlider(inputX)
-    local startX = flySpeedSliderFrame.AbsolutePosition.X
-    local width = math.max(flySpeedSliderFrame.AbsoluteSize.X, 1)
-    local percentage = math.clamp((inputX - startX) / width, 0, 1)
-    flySpeed = math.floor(percentage * 390) + 10
+    local sliderFrameAbsolutePositionX = flySpeedSliderFrame.AbsolutePosition.X
+    local sliderFrameAbsoluteSizeX = flySpeedSliderFrame.AbsoluteSize.X
+    local relativeX = math.clamp(inputX - sliderFrameAbsolutePositionX, 0, sliderFrameAbsoluteSizeX)
+    local percentage = relativeX / sliderFrameAbsoluteSizeX
+
+    flySpeed = math.floor(percentage * 390) + 10 -- 10 到 400
     flySpeedLabel.Text = "飛行速度: " .. flySpeed
     flySpeedSlider.Size = UDim2.new(percentage, 0, 1, 0)
     flySpeedThumb.Position = UDim2.new(percentage, -5, -0.5, 0)
 end
+
 flySpeedSlider.MouseButton1Down:Connect(function() isDraggingSlider = true end)
-flySpeedSlider.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true; updateSlider(input.Position.X) end
-end)
+flySpeedSlider.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = true end end)
+
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingSlider = false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateSlider(input.Position.X) end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        isDraggingSlider = false
+    end
 end)
 
+UserInputService.InputChanged:Connect(function(input)
+    if isDraggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateSlider(input.Position.X)
+    end
+end)
+
+-- 面板切換
 flySettingsButton.MouseButton1Click:Connect(function()
     MainPanel.Visible = false
     InfoPanel.Visible = false
     BattlePanel.Visible = false
     SpeedPanel.Visible = false
-    if ESPPanel then ESPPanel.Visible = false end
     FlyPanel.Visible = true
     updatePanelStatus()
 end)
+
 flyBackButton.MouseButton1Click:Connect(function()
     FlyPanel.Visible = false
     MainPanel.Visible = true
     updatePanelStatus()
-end)
-Player.CharacterAdded:Connect(function()
-    if isFlying then task.wait(0.5); startFreeFly() end
 end)
 -- ========== 自由飛行功能代碼結束 ==========
 
@@ -1314,10 +1276,7 @@ local function updatePanelStatus()
     elseif BattlePanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(255, 150, 50)
         IconButton.BackgroundTransparency = 0
-    elseif ESPPanel and ESPPanel.Visible then
-        IconButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-        IconButton.BackgroundTransparency = 0
-    elseif FlyPanel.Visible then
+        elseif FlyPanel.Visible then
         IconButton.BackgroundColor3 = Color3.fromRGB(150, 100, 255)
         IconButton.BackgroundTransparency = 0
     elseif SpeedPanel.Visible then
@@ -1331,289 +1290,103 @@ end
 
 -- 圖標點擊事件
 IconButton.MouseButton1Click:Connect(function()
-    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible or (ESPPanel and ESPPanel.Visible) then
+    if MainPanel.Visible or InfoPanel.Visible or BattlePanel.Visible or SpeedPanel.Visible or FlyPanel.Visible then
         MainPanel.Visible = false
         InfoPanel.Visible = false
         BattlePanel.Visible = false
         SpeedPanel.Visible = false
         FlyPanel.Visible = false
-        if ESPPanel then ESPPanel.Visible = false end
     else
         MainPanel.Visible = true
     end
     updatePanelStatus()
 end)
 
--- ========== ESP 玩家設定功能 ==========
+-- ========== ESP 玩家功能 ==========
 local espEnabled = false
-local ESPSettings = {
-    Level = false,
-    Distance = false,
-    Health = false,
-    Order = {}
-}
 local espFolder = Instance.new("Folder")
 espFolder.Name = "ESPFolder"
 espFolder.Parent = workspace
-local espConnections = {}
-
-ESPPanel = Instance.new("Frame")
-ESPPanel.Name = "ESPPanel"
-ESPPanel.Size = UDim2.new(0, 300, 0, 390)
-ESPPanel.Position = UDim2.new(0, 90, 0, 20)
-ESPPanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-ESPPanel.BackgroundTransparency = 0.1
-ESPPanel.Visible = false
-ESPPanel.Parent = ScreenGui
-Instance.new("UICorner", ESPPanel).CornerRadius = UDim.new(0, 12)
-
-local espPanelTitle = Instance.new("TextLabel")
-espPanelTitle.Size = UDim2.new(0, 260, 0, 35)
-espPanelTitle.Position = UDim2.new(0, 20, 0, 10)
-espPanelTitle.BackgroundTransparency = 1
-espPanelTitle.Text = "ESP 玩家設定"
-espPanelTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-espPanelTitle.TextScaled = true
-espPanelTitle.Font = Enum.Font.GothamBold
-espPanelTitle.Parent = ESPPanel
-
-local espToggleButton = Instance.new("TextButton")
-espToggleButton.Size = UDim2.new(0, 260, 0, 40)
-espToggleButton.Position = UDim2.new(0, 20, 0, 55)
-espToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-espToggleButton.Text = "ESP 玩家：關閉"
-espToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-espToggleButton.TextScaled = true
-espToggleButton.Parent = ESPPanel
-Instance.new("UICorner", espToggleButton).CornerRadius = UDim.new(0, 8)
-
-local levelToggleButton = Instance.new("TextButton")
-levelToggleButton.Size = UDim2.new(0, 260, 0, 40)
-levelToggleButton.Position = UDim2.new(0, 20, 0, 105)
-levelToggleButton.BackgroundColor3 = Color3.fromRGB(80, 110, 160)
-levelToggleButton.Text = "顯示等級：關閉"
-levelToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-levelToggleButton.TextScaled = true
-levelToggleButton.Parent = ESPPanel
-Instance.new("UICorner", levelToggleButton).CornerRadius = UDim.new(0, 8)
-
-local distanceToggleButton = Instance.new("TextButton")
-distanceToggleButton.Size = UDim2.new(0, 260, 0, 40)
-distanceToggleButton.Position = UDim2.new(0, 20, 0, 155)
-distanceToggleButton.BackgroundColor3 = Color3.fromRGB(80, 110, 160)
-distanceToggleButton.Text = "顯示距離：關閉"
-distanceToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-distanceToggleButton.TextScaled = true
-distanceToggleButton.Parent = ESPPanel
-Instance.new("UICorner", distanceToggleButton).CornerRadius = UDim.new(0, 8)
-
-local healthToggleButton = Instance.new("TextButton")
-healthToggleButton.Size = UDim2.new(0, 260, 0, 40)
-healthToggleButton.Position = UDim2.new(0, 20, 0, 205)
-healthToggleButton.BackgroundColor3 = Color3.fromRGB(80, 110, 160)
-healthToggleButton.Text = "顯示血量：關閉"
-healthToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-healthToggleButton.TextScaled = true
-healthToggleButton.Parent = ESPPanel
-Instance.new("UICorner", healthToggleButton).CornerRadius = UDim.new(0, 8)
-
-local espOrderHint = Instance.new("TextLabel")
-espOrderHint.Size = UDim2.new(0, 260, 0, 42)
-espOrderHint.Position = UDim2.new(0, 20, 0, 255)
-espOrderHint.BackgroundTransparency = 1
-espOrderHint.Text = "名稱固定在最上方；其餘內容依開啟順序排列"
-espOrderHint.TextColor3 = Color3.fromRGB(210, 210, 210)
-espOrderHint.TextScaled = true
-espOrderHint.TextWrapped = true
-espOrderHint.Font = Enum.Font.Gotham
-espOrderHint.Parent = ESPPanel
-
-local espBackButton = Instance.new("TextButton")
-espBackButton.Size = UDim2.new(0, 260, 0, 40)
-espBackButton.Position = UDim2.new(0, 20, 0, 325)
-espBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
-espBackButton.Text = "返回主頁"
-espBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-espBackButton.TextScaled = true
-espBackButton.Parent = ESPPanel
-Instance.new("UICorner", espBackButton).CornerRadius = UDim.new(0, 8)
 
 local function getPlayerLevel(targetPlayer)
     local ok, level = pcall(function() return targetPlayer.Data.Level.Value end)
-    return (ok and level) and tostring(level) or "?"
-end
-
-local function getDistanceText(targetPlayer)
-    local ownRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not ownRoot or not targetRoot then return "距離：?" end
-    return "距離：" .. tostring(math.floor((targetRoot.Position - ownRoot.Position).Magnitude + 0.5))
-end
-
-local function getHealthText(targetPlayer)
-    local humanoid = targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return "血量：?" end
-    return "血量：" .. tostring(math.floor(humanoid.Health + 0.5)) .. "/" .. tostring(math.floor(humanoid.MaxHealth + 0.5))
-end
-
-local function renderESPLayout(targetPlayer, billboard)
-    local content = billboard:FindFirstChild("Content")
-    if not content then return end
-    content:ClearAllChildren()
-
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 1)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.Parent = content
-
-    local function addLine(name, text, color, bold)
-        local line = Instance.new("TextLabel")
-        line.Name = name
-        line.Size = UDim2.new(1, 0, 0, 20)
-        line.BackgroundTransparency = 1
-        line.Text = text
-        line.TextColor3 = color
-        line.TextScaled = true
-        line.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
-        line.TextStrokeTransparency = 0
-        line.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-        line.Parent = content
-        return line
-    end
-
-    addLine("NameLine", targetPlayer.Name, Color3.fromRGB(255, 255, 100), true)
-    for _, key in ipairs(ESPSettings.Order) do
-        if key == "Level" and ESPSettings.Level then
-            addLine("LevelLine", "Lv. " .. getPlayerLevel(targetPlayer), Color3.fromRGB(100, 220, 255), false)
-        elseif key == "Distance" and ESPSettings.Distance then
-            addLine("DistanceLine", getDistanceText(targetPlayer), Color3.fromRGB(150, 255, 150), false)
-        elseif key == "Health" and ESPSettings.Health then
-            addLine("HealthLine", getHealthText(targetPlayer), Color3.fromRGB(255, 130, 130), false)
-        end
-    end
-
-    billboard.Size = UDim2.new(0, 180, 0, 22 + (#ESPSettings.Order * 21))
-end
-
-local function updateESPValues(targetPlayer, billboard)
-    local character = targetPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if root then billboard.Adornee = root end
-    local content = billboard:FindFirstChild("Content")
-    if not content then return end
-    local levelLine = content:FindFirstChild("LevelLine")
-    local distanceLine = content:FindFirstChild("DistanceLine")
-    local healthLine = content:FindFirstChild("HealthLine")
-    if levelLine then levelLine.Text = "Lv. " .. getPlayerLevel(targetPlayer) end
-    if distanceLine then distanceLine.Text = getDistanceText(targetPlayer) end
-    if healthLine then healthLine.Text = getHealthText(targetPlayer) end
+    if ok and level then return tostring(level) end
+    return "?"
 end
 
 local function createESP(targetPlayer)
-    if targetPlayer == Player or espFolder:FindFirstChild(targetPlayer.Name) then return end
+    if espFolder:FindFirstChild(targetPlayer.Name) then return end
     local billboard = Instance.new("BillboardGui")
     billboard.Name = targetPlayer.Name
-    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 160, 0, 50)
     billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
     billboard.Parent = espFolder
 
-    local content = Instance.new("Frame")
-    content.Name = "Content"
-    content.Size = UDim2.new(1, 0, 1, 0)
-    content.BackgroundTransparency = 1
-    content.Parent = billboard
-    renderESPLayout(targetPlayer, billboard)
-    updateESPValues(targetPlayer, billboard)
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = targetPlayer.Name
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.Parent = billboard
 
-    espConnections[targetPlayer] = RunService.Heartbeat:Connect(function()
-        if not espEnabled or not targetPlayer.Parent or not billboard.Parent then
-            if espConnections[targetPlayer] then espConnections[targetPlayer]:Disconnect(); espConnections[targetPlayer] = nil end
-            if billboard.Parent then billboard:Destroy() end
+    local levelLabel = Instance.new("TextLabel")
+    levelLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    levelLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    levelLabel.BackgroundTransparency = 1
+    levelLabel.TextColor3 = Color3.fromRGB(100, 220, 255)
+    levelLabel.TextScaled = true
+    levelLabel.Font = Enum.Font.Gotham
+    levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
+    levelLabel.TextStrokeTransparency = 0
+    levelLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    levelLabel.Parent = billboard
+
+    local updateConn
+    updateConn = RunService.Heartbeat:Connect(function()
+        if not espEnabled or not targetPlayer or not targetPlayer.Parent then
+            billboard:Destroy()
+            updateConn:Disconnect()
             return
         end
-        updateESPValues(targetPlayer, billboard)
+        local char = targetPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then billboard.Adornee = hrp end
+        end
+        levelLabel.Text = "Lv. " .. getPlayerLevel(targetPlayer)
     end)
 end
 
 local function clearAllESP()
-    for targetPlayer, connection in pairs(espConnections) do
-        connection:Disconnect()
-        espConnections[targetPlayer] = nil
-    end
-    for _, billboard in ipairs(espFolder:GetChildren()) do billboard:Destroy() end
+    for _, v in ipairs(espFolder:GetChildren()) do v:Destroy() end
 end
 
 local function buildAllESP()
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do createESP(targetPlayer) end
-end
-
-local function updateAllESPLayouts()
-    if not espEnabled then return end
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        local billboard = espFolder:FindFirstChild(targetPlayer.Name)
-        if billboard then renderESPLayout(targetPlayer, billboard); updateESPValues(targetPlayer, billboard) end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player then createESP(p) end
     end
 end
 
-local function updateExtraButton(button, label, enabled)
-    button.Text = label .. (enabled and "：開啟" or "：關閉")
-    button.BackgroundColor3 = enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(80, 110, 160)
-end
-
-local function toggleExtra(key, button, label)
-    ESPSettings[key] = not ESPSettings[key]
-    if ESPSettings[key] then
-        local exists = false
-        for _, value in ipairs(ESPSettings.Order) do if value == key then exists = true break end end
-        if not exists then table.insert(ESPSettings.Order, key) end
-    else
-        for index, value in ipairs(ESPSettings.Order) do
-            if value == key then table.remove(ESPSettings.Order, index); break end
-        end
-    end
-    updateExtraButton(button, label, ESPSettings[key])
-    updateAllESPLayouts()
-end
+Players.PlayerAdded:Connect(function(p)
+    if espEnabled then createESP(p) end
+end)
 
 espButton.MouseButton1Click:Connect(function()
-    MainPanel.Visible = false
-    InfoPanel.Visible = false
-    BattlePanel.Visible = false
-    SpeedPanel.Visible = false
-    FlyPanel.Visible = false
-    ESPPanel.Visible = true
-    updatePanelStatus()
-end)
-
-espToggleButton.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     if espEnabled then
-        espToggleButton.Text = "ESP 玩家：開啟"
-        espToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        espButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        espButton.Text = "ESP 玩家 關閉"
         buildAllESP()
     else
-        espToggleButton.Text = "ESP 玩家：關閉"
-        espToggleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        espButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+        espButton.Text = "ESP 玩家 開啟"
         clearAllESP()
     end
-end)
-levelToggleButton.MouseButton1Click:Connect(function() toggleExtra("Level", levelToggleButton, "顯示等級") end)
-distanceToggleButton.MouseButton1Click:Connect(function() toggleExtra("Distance", distanceToggleButton, "顯示距離") end)
-healthToggleButton.MouseButton1Click:Connect(function() toggleExtra("Health", healthToggleButton, "顯示血量") end)
-espBackButton.MouseButton1Click:Connect(function()
-    ESPPanel.Visible = false
-    MainPanel.Visible = true
-    updatePanelStatus()
-end)
-
-Players.PlayerAdded:Connect(function(targetPlayer)
-    if espEnabled then createESP(targetPlayer) end
-end)
-Players.PlayerRemoving:Connect(function(targetPlayer)
-    local connection = espConnections[targetPlayer]
-    if connection then connection:Disconnect(); espConnections[targetPlayer] = nil end
-    local billboard = espFolder:FindFirstChild(targetPlayer.Name)
-    if billboard then billboard:Destroy() end
 end)
 -- ========== ESP 玩家功能結束 ==========
 
