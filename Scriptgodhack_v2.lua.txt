@@ -358,7 +358,7 @@ infoTextCorner.Parent = infoText
 -- 創建自動戰鬥面板
 local BattlePanel = Instance.new("Frame")
 BattlePanel.Name = "BattlePanel"
-BattlePanel.Size = UDim2.new(0, 300, 0, 285)
+BattlePanel.Size = UDim2.new(0, 300, 0, 350)
 BattlePanel.Position = UDim2.new(0, 90, 0, 20)
 BattlePanel.BackgroundColor3 = Color3.fromRGB(0,0,0)
 BattlePanel.BackgroundTransparency = 0.1
@@ -372,8 +372,8 @@ BattlePanelCorner.Parent = BattlePanel
 -- 標題
 local battleTitle = Instance.new("TextLabel")
 battleTitle.Name = "BattleTitle"
-battleTitle.Size = UDim2.new(0, 260, 0, 35)
-battleTitle.Position = UDim2.new(0, 20, 0, 10)
+battleTitle.Size = UDim2.new(1, 0, 0, 35)
+battleTitle.Position = UDim2.new(0, 0, 0, 0)
 battleTitle.BackgroundTransparency = 1
 battleTitle.Text = "自動戰鬥設置"
 battleTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -381,65 +381,101 @@ battleTitle.TextScaled = true
 battleTitle.Font = Enum.Font.GothamBold
 battleTitle.Parent = BattlePanel
 
--- 重生成海盜按鈕
-local respawnPirateButton = Instance.new("TextButton")
-respawnPirateButton.Name = "RespawnPirateButton"
-respawnPirateButton.Size = UDim2.new(0, 260, 0, 40)
-respawnPirateButton.Position = UDim2.new(0, 20, 0, 55)
-respawnPirateButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-respawnPirateButton.Text = "重生成海盜"
-respawnPirateButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-respawnPirateButton.TextScaled = true
-respawnPirateButton.Parent = BattlePanel
+-- ScrollingFrame
+local BattleScroll = Instance.new("ScrollingFrame")
+BattleScroll.Name = "BattleScroll"
+BattleScroll.Size = UDim2.new(1, 0, 1, -38)
+BattleScroll.Position = UDim2.new(0, 0, 0, 38)
+BattleScroll.BackgroundTransparency = 1
+BattleScroll.ScrollBarThickness = 4
+BattleScroll.ScrollBarImageColor3 = Color3.fromRGB(150, 150, 150)
+BattleScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+BattleScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+BattleScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+BattleScroll.Active = true
+BattleScroll.Parent = BattlePanel
 
-local respawnPirateCorner = Instance.new("UICorner")
-respawnPirateCorner.CornerRadius = UDim.new(0, 8)
-respawnPirateCorner.Parent = respawnPirateButton
+local BattleListLayout = Instance.new("UIListLayout")
+BattleListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+BattleListLayout.Padding = UDim.new(0, 8)
+BattleListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+BattleListLayout.Parent = BattleScroll
+
+local BattlePadding = Instance.new("UIPadding")
+BattlePadding.PaddingTop = UDim.new(0, 6)
+BattlePadding.PaddingBottom = UDim.new(0, 10)
+BattlePadding.Parent = BattleScroll
+
+-- 建立戰鬥面板按鈕輔助函數
+local function makeBattleButton(text, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 260, 0, 42)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.Gotham
+    btn.Parent = BattleScroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+-- 重生成海盜按鈕
+local respawnPirateButton = makeBattleButton("重生成海盜", Color3.fromRGB(200, 60, 60))
 
 -- 重生成海軍按鈕
-local respawnMarineButton = Instance.new("TextButton")
-respawnMarineButton.Name = "RespawnMarineButton"
-respawnMarineButton.Size = UDim2.new(0, 260, 0, 40)
-respawnMarineButton.Position = UDim2.new(0, 20, 0, 103)
-respawnMarineButton.BackgroundColor3 = Color3.fromRGB(60, 100, 200)
-respawnMarineButton.Text = "重生成海軍"
-respawnMarineButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-respawnMarineButton.TextScaled = true
-respawnMarineButton.Parent = BattlePanel
+local respawnMarineButton = makeBattleButton("重生成海軍", Color3.fromRGB(60, 100, 200))
 
-local respawnMarineCorner = Instance.new("UICorner")
-respawnMarineCorner.CornerRadius = UDim.new(0, 8)
-respawnMarineCorner.Parent = respawnMarineButton
+-- 自動攻擊開關按鈕
+local toggleAutoBattleButton = makeBattleButton("關閉自動攻擊", Color3.fromRGB(200, 80, 80))
 
--- 自動戰鬥開關按鈕（在海軍下面）
-local toggleAutoBattleButton = Instance.new("TextButton")
-toggleAutoBattleButton.Name = "ToggleAutoBattleButton"
-toggleAutoBattleButton.Size = UDim2.new(0, 260, 0, 40)
-toggleAutoBattleButton.Position = UDim2.new(0, 20, 0, 151)
-toggleAutoBattleButton.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
-toggleAutoBattleButton.Text = "關閉自動攻擊"
-toggleAutoBattleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleAutoBattleButton.TextScaled = true
-toggleAutoBattleButton.Parent = BattlePanel
+-- 分隔線標題
+local aimSectionLabel = Instance.new("TextLabel")
+aimSectionLabel.Size = UDim2.new(0, 260, 0, 28)
+aimSectionLabel.BackgroundTransparency = 1
+aimSectionLabel.Text = "── 自動瞄準 ──"
+aimSectionLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+aimSectionLabel.TextScaled = true
+aimSectionLabel.Font = Enum.Font.Gotham
+aimSectionLabel.Parent = BattleScroll
 
-local toggleAutoBattleCorner = Instance.new("UICorner")
-toggleAutoBattleCorner.CornerRadius = UDim.new(0, 8)
-toggleAutoBattleCorner.Parent = toggleAutoBattleButton
+-- 選擇目標玩家按鈕（點擊後展開玩家列表）
+local selectTargetButton = Instance.new("TextButton")
+selectTargetButton.Size = UDim2.new(0, 260, 0, 42)
+selectTargetButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+selectTargetButton.Text = "選擇目標玩家"
+selectTargetButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+selectTargetButton.TextScaled = true
+selectTargetButton.Font = Enum.Font.Gotham
+selectTargetButton.Parent = BattleScroll
+Instance.new("UICorner", selectTargetButton).CornerRadius = UDim.new(0, 8)
+
+-- 玩家列表 Frame（展開/收合用）
+local playerListFrame = Instance.new("Frame")
+playerListFrame.Size = UDim2.new(0, 260, 0, 0) -- 高度動態
+playerListFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+playerListFrame.BackgroundTransparency = 0.3
+playerListFrame.Visible = false
+playerListFrame.ClipsDescendants = true
+playerListFrame.Parent = BattleScroll
+Instance.new("UICorner", playerListFrame).CornerRadius = UDim.new(0, 8)
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 4)
+playerListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+playerListLayout.Parent = playerListFrame
+
+local playerListPadding = Instance.new("UIPadding")
+playerListPadding.PaddingTop = UDim.new(0, 4)
+playerListPadding.PaddingBottom = UDim.new(0, 4)
+playerListPadding.Parent = playerListFrame
+
+-- 自動瞄準開關按鈕
+local autoAimButton = makeBattleButton("自動瞄準 開啟", Color3.fromRGB(100, 100, 100))
+autoAimButton.TextColor3 = Color3.fromRGB(180, 180, 180) -- 預設灰色，未選目標時禁用
 
 -- 返回按鈕
-local battleBackButton = Instance.new("TextButton")
-battleBackButton.Name = "BattleBackButton"
-battleBackButton.Size = UDim2.new(0, 260, 0, 40)
-battleBackButton.Position = UDim2.new(0, 20, 0, 230)
-battleBackButton.BackgroundColor3 = Color3.fromRGB(200, 120, 80)
-battleBackButton.Text = "返回主頁"
-battleBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-battleBackButton.TextScaled = true
-battleBackButton.Parent = BattlePanel
-
-local battleBackCorner = Instance.new("UICorner")
-battleBackCorner.CornerRadius = UDim.new(0, 8)
-battleBackCorner.Parent = battleBackButton
+local battleBackButton = makeBattleButton("返回主頁", Color3.fromRGB(200, 120, 80))
 
 -- 创建速度设置面板
 local SpeedPanel = Instance.new("Frame")
@@ -1025,6 +1061,140 @@ toggleAutoBattleButton.MouseButton1Click:Connect(function()
         })
     end
 end)
+
+-- ========== 自動瞄準功能 ==========
+local aimTarget = nil       -- 目前選中的目標玩家
+local autoAimEnabled = false
+local aimConnection = nil
+local playerListOpen = false
+
+-- 更新玩家列表
+local function refreshPlayerList()
+    -- 清除舊的列表
+    for _, v in ipairs(playerListFrame:GetChildren()) do
+        if v:IsA("TextButton") then v:Destroy() end
+    end
+
+    local playerCount = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Player then
+            playerCount = playerCount + 1
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 240, 0, 36)
+            btn.BackgroundColor3 = (aimTarget == p)
+                and Color3.fromRGB(80, 200, 120)
+                or  Color3.fromRGB(50, 50, 50)
+            btn.Text = p.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextScaled = true
+            btn.Font = Enum.Font.Gotham
+            btn.Parent = playerListFrame
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+            btn.MouseButton1Click:Connect(function()
+                aimTarget = p
+                selectTargetButton.Text = "目標: " .. p.Name
+                selectTargetButton.BackgroundColor3 = Color3.fromRGB(60, 140, 60)
+                -- 解鎖自動瞄準按鈕
+                autoAimButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+                autoAimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+                -- 關閉列表
+                playerListOpen = false
+                playerListFrame.Visible = false
+                -- 刷新顏色
+                refreshPlayerList()
+            end)
+        end
+    end
+
+    -- 動態調整列表高度（每個按鈕 36 + 間距 4，上下 padding 各 4）
+    local listHeight = playerCount * 40 + 8
+    playerListFrame.Size = UDim2.new(0, 260, 0, listHeight)
+end
+
+-- 選擇目標玩家按鈕：點擊展開/收合列表
+selectTargetButton.MouseButton1Click:Connect(function()
+    playerListOpen = not playerListOpen
+    if playerListOpen then
+        refreshPlayerList()
+        playerListFrame.Visible = true
+    else
+        playerListFrame.Visible = false
+    end
+end)
+
+-- 玩家離開時自動清除目標
+Players.PlayerRemoving:Connect(function(p)
+    if aimTarget == p then
+        aimTarget = nil
+        autoAimEnabled = false
+        if aimConnection then
+            aimConnection:Disconnect()
+            aimConnection = nil
+        end
+        selectTargetButton.Text = "選擇目標玩家"
+        selectTargetButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        autoAimButton.Text = "自動瞄準 開啟"
+        autoAimButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        autoAimButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+    end
+end)
+
+-- 自動瞄準：在技能輸入時瞬間轉向目標（監聽 InputBegan）
+local UserInputService = game:GetService("UserInputService")
+
+-- 技能按鍵列表（Blox Fruits 常見技能鍵）
+local skillKeys = {
+    Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V,
+    Enum.KeyCode.F, Enum.KeyCode.T,
+    Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2,
+}
+
+local function faceTarget()
+    if not aimTarget or not aimTarget.Character then return end
+    local char = Player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local targetHrp = aimTarget.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetHrp then return end
+
+    -- 只旋轉水平方向（不會仰頭）
+    local direction = (targetHrp.Position - hrp.Position) * Vector3.new(1, 0, 1)
+    if direction.Magnitude < 0.1 then return end
+    hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + direction.Unit)
+end
+
+autoAimButton.MouseButton1Click:Connect(function()
+    -- 沒選目標就不能開啟
+    if not aimTarget then return end
+
+    autoAimEnabled = not autoAimEnabled
+
+    if autoAimEnabled then
+        autoAimButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        autoAimButton.Text = "自動瞄準 關閉"
+
+        -- 監聽技能按鍵，按下瞬間轉向
+        aimConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if not autoAimEnabled then return end
+            -- 檢查是否是技能鍵
+            for _, key in ipairs(skillKeys) do
+                if input.KeyCode == key or input.UserInputType == key then
+                    faceTarget()
+                    break
+                end
+            end
+        end)
+    else
+        autoAimButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
+        autoAimButton.Text = "自動瞄準 開啟"
+        if aimConnection then
+            aimConnection:Disconnect()
+            aimConnection = nil
+        end
+    end
+end)
+-- ========== 自動瞄準功能結束 ==========
 
 -- ========== 速度控制功能代碼開始 ==========
 local TweenService = game:GetService("TweenService")
