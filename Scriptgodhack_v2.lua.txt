@@ -1125,13 +1125,18 @@ end)
 
 -- 玩家離開時自動清除目標
 
--- ========== 自動瞄準（連續鎖定，紅隊測試用） ==========
-local AIM_FOV      = 140    -- 視角限制（度），360 = 不限
+-- ========== 自動瞄準（只在放招瞬間轉向） ==========
+local UserInputService = game:GetService("UserInputService")
 local AIM_MAX_DIST = 800
-local AIM_SMOOTH   = 0.45   -- 每幀插值，1 = 瞬間貼上
-local AIM_HEIGHT   = 1.5    -- 瞄準點高度偏移
+local AIM_HOLD     = 0.2   -- 放招後關 AutoRotate 的時間
+local AIM_KEYS = {
+    Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C,
+    Enum.KeyCode.V, Enum.KeyCode.F,
+}
 
 local savedAutoRotate = nil
+local restoreToken    = 0
+local aimKeyConn      = nil
 
 local function isTargetValid(p)
     if not p or p == Player or not p.Parent then return false end
@@ -1152,63 +1157,49 @@ local function resetAimButton()
     autoAimButton.TextColor3 = Color3.fromRGB(180, 180, 180)
 end
 
-local function stopAutoAim()
-    if aimConnection then aimConnection:Disconnect() end
-    aimConnection = nil
-    autoAimEnabled = false
-    if savedAutoRotate ~= nil then
-        local hum = Player.Character
-            and Player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = savedAutoRotate end
-        savedAutoRotate = nil
+local function restoreAutoRotate(token)
+    if token ~= restoreToken then return end
+    local hum = Player.Character
+        and Player.Character:FindFirstChildOfClass("Humanoid")
+    if hum and savedAutoRotate ~= nil then
+        hum.AutoRotate = savedAutoRotate
     end
-    resetAimButton()
+    savedAutoRotate = nil
 end
 
-local function aimStep()
-    if not autoAimEnabled then return end
-    if not isTargetValid(aimTarget) then
-        stopAutoAim()
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "自動瞄準",
-            Text = "目標失效（死亡／重生／超距），已自動關閉",
-            Duration = 3
-        })
-        return
-    end
+local function castAim()
+    if not autoAimEnabled or not isTargetValid(aimTarget) then return end
+    local myChar = Player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local hum    = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    local tChar  = aimTarget.Character
+    local tRoot  = tChar and tChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot or not tRoot then return end
 
-    local camera = workspace.CurrentCamera
-    local myRoot = Player.Character
-        and Player.Character:FindFirstChild("HumanoidRootPart")
-    local targetRoot = aimTarget.Character
-        and aimTarget.Character:FindFirstChild("HumanoidRootPart")
-    if not camera or not myRoot or not targetRoot then return end
+    local flat = Vector3.new(tRoot.Position.X - myRoot.Position.X, 0,
+        tRoot.Position.Z - myRoot.Position.Z)
+    if flat.Magnitude < 0.1 then return end
+    flat = flat.Unit
 
-    local aimPoint = targetRoot.Position + Vector3.new(0, AIM_HEIGHT, 0)
-    local toTarget = aimPoint - camera.CFrame.Position
+    if hum and savedAutoRotate == nil then savedAutoRotate = hum.AutoRotate end
+    if hum then hum.AutoRotate = false end
 
-    if AIM_FOV < 360 then
-        local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0,
-            camera.CFrame.LookVector.Z)
-        local flatDir = Vector3.new(toTarget.X, 0, toTarget.Z)
-        if flatLook.Magnitude > 1e-3 and flatDir.Magnitude > 1e-3 then
-            local ang = math.deg(math.acos(math.clamp(
-                flatLook.Unit:Dot(flatDir.Unit), -1, 1)))
-            if ang > AIM_FOV / 2 then return end
-        end
-    end
+    myRoot.CFrame = CFrame.lookAt(myRoot.Position, myRoot.Position + flat)
+    -- 若移動技能是沿 MoveDirection 衝，再打開下一行：
+    -- hum:Move(flat, false)
 
-    -- 相機平滑轉向
-    local desired = CFrame.lookAt(camera.CFrame.Position, aimPoint)
-    camera.CFrame = camera.CFrame:Lerp(desired,
-        math.clamp(AIM_SMOOTH, 0.01, 1))
+    restoreToken = restoreToken + 1
+    local token = restoreToken
+    task.delay(AIM_HOLD, function() restoreAutoRotate(token) end)
+end
 
-    -- 角色水平朝向（移動技能的位移方向看這個）
-    local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
-    if flat.Magnitude > 0.1 then
-        myRoot.CFrame = CFrame.lookAt(myRoot.Position,
-            myRoot.Position + flat.Unit)
-    end
+local function stopAutoAim()
+    if aimKeyConn then aimKeyConn:Disconnect() end
+    aimKeyConn = nil
+    autoAimEnabled = false
+    restoreToken = restoreToken + 1
+    restoreAutoRotate(restoreToken)
+    resetAimButton()
 end
 
 local function startAutoAim()
@@ -1219,30 +1210,23 @@ local function startAutoAim()
     end
     if not isTargetValid(aimTarget) then
         game.StarterGui:SetCore("SendNotification",
-            { Title = "自動瞄準", Text = "目標無效（已死亡或超距）", Duration = 3 })
+            { Title = "自動瞄準", Text = "目標無效（死亡或超距）", Duration = 3 })
         return
     end
     stopAutoAim()
     autoAimEnabled = true
-    local hum = Player.Character
-        and Player.Character:FindFirstChildOfClass("Humanoid")
-    if hum then
-        savedAutoRotate = hum.AutoRotate
-        hum.AutoRotate = false
-    end
-    aimConnection = RunService.RenderStepped:Connect(aimStep)
+    aimKeyConn = UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+        for _, k in ipairs(AIM_KEYS) do
+            if input.KeyCode == k then castAim(); break end
+        end
+    end)
     autoAimButton.Text = "自動瞄準 關閉"
     autoAimButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 end
 
 autoAimButton.MouseButton1Click:Connect(function()
-    if autoAimEnabled then
-        stopAutoAim()
-        game.StarterGui:SetCore("SendNotification",
-            { Title = "自動瞄準", Text = "已關閉", Duration = 2 })
-    else
-        startAutoAim()
-    end
+    if autoAimEnabled then stopAutoAim() else startAutoAim() end
 end)
 
 Players.PlayerRemoving:Connect(function(p)
