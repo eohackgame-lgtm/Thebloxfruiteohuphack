@@ -1124,77 +1124,135 @@ selectTargetButton.MouseButton1Click:Connect(function()
 end)
 
 -- 玩家離開時自動清除目標
-Players.PlayerRemoving:Connect(function(p)
-    if aimTarget == p then
-        aimTarget = nil
-        autoAimEnabled = false
-        if aimConnection then
-            aimConnection:Disconnect()
-            aimConnection = nil
-        end
-        selectTargetButton.Text = "選擇目標玩家"
-        selectTargetButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        autoAimButton.Text = "自動瞄準 開啟"
-        autoAimButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        autoAimButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+
+-- ========== 自動瞄準（連續鎖定，紅隊測試用） ==========
+local AIM_FOV      = 140    -- 視角限制（度），360 = 不限
+local AIM_MAX_DIST = 800
+local AIM_SMOOTH   = 0.45   -- 每幀插值，1 = 瞬間貼上
+local AIM_HEIGHT   = 1.5    -- 瞄準點高度偏移
+
+local savedAutoRotate = nil
+
+local function isTargetValid(p)
+    if not p or p == Player or not p.Parent then return false end
+    local char = p.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root or hum.Health <= 0 then return false end
+    local myRoot = Player.Character
+        and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return false end
+    return (root.Position - myRoot.Position).Magnitude <= AIM_MAX_DIST
+end
+
+local function resetAimButton()
+    autoAimButton.Text = "自動瞄準 開啟"
+    autoAimButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    autoAimButton.TextColor3 = Color3.fromRGB(180, 180, 180)
+end
+
+local function stopAutoAim()
+    if aimConnection then aimConnection:Disconnect() end
+    aimConnection = nil
+    autoAimEnabled = false
+    if savedAutoRotate ~= nil then
+        local hum = Player.Character
+            and Player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.AutoRotate = savedAutoRotate end
+        savedAutoRotate = nil
     end
-end)
+    resetAimButton()
+end
 
--- 自動瞄準：在技能輸入時瞬間轉向目標（監聽 InputBegan）
-local UserInputService = game:GetService("UserInputService")
+local function aimStep()
+    if not autoAimEnabled then return end
+    if not isTargetValid(aimTarget) then
+        stopAutoAim()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自動瞄準",
+            Text = "目標失效（死亡／重生／超距），已自動關閉",
+            Duration = 3
+        })
+        return
+    end
 
--- 技能按鍵列表（Blox Fruits 常見技能鍵）
-local skillKeys = {
-    Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C, Enum.KeyCode.V,
-    Enum.KeyCode.F, Enum.KeyCode.T,
-    Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2,
-}
+    local camera = workspace.CurrentCamera
+    local myRoot = Player.Character
+        and Player.Character:FindFirstChild("HumanoidRootPart")
+    local targetRoot = aimTarget.Character
+        and aimTarget.Character:FindFirstChild("HumanoidRootPart")
+    if not camera or not myRoot or not targetRoot then return end
 
-local function faceTarget()
-    if not aimTarget or not aimTarget.Character then return end
-    local char = Player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local targetHrp = aimTarget.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp or not targetHrp then return end
+    local aimPoint = targetRoot.Position + Vector3.new(0, AIM_HEIGHT, 0)
+    local toTarget = aimPoint - camera.CFrame.Position
 
-    -- 只旋轉水平方向（不會仰頭）
-    local direction = (targetHrp.Position - hrp.Position) * Vector3.new(1, 0, 1)
-    if direction.Magnitude < 0.1 then return end
-    hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + direction.Unit)
+    if AIM_FOV < 360 then
+        local flatLook = Vector3.new(camera.CFrame.LookVector.X, 0,
+            camera.CFrame.LookVector.Z)
+        local flatDir = Vector3.new(toTarget.X, 0, toTarget.Z)
+        if flatLook.Magnitude > 1e-3 and flatDir.Magnitude > 1e-3 then
+            local ang = math.deg(math.acos(math.clamp(
+                flatLook.Unit:Dot(flatDir.Unit), -1, 1)))
+            if ang > AIM_FOV / 2 then return end
+        end
+    end
+
+    -- 相機平滑轉向
+    local desired = CFrame.lookAt(camera.CFrame.Position, aimPoint)
+    camera.CFrame = camera.CFrame:Lerp(desired,
+        math.clamp(AIM_SMOOTH, 0.01, 1))
+
+    -- 角色水平朝向（移動技能的位移方向看這個）
+    local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
+    if flat.Magnitude > 0.1 then
+        myRoot.CFrame = CFrame.lookAt(myRoot.Position,
+            myRoot.Position + flat.Unit)
+    end
+end
+
+local function startAutoAim()
+    if not aimTarget then
+        game.StarterGui:SetCore("SendNotification",
+            { Title = "自動瞄準", Text = "請先選擇目標玩家", Duration = 3 })
+        return
+    end
+    if not isTargetValid(aimTarget) then
+        game.StarterGui:SetCore("SendNotification",
+            { Title = "自動瞄準", Text = "目標無效（已死亡或超距）", Duration = 3 })
+        return
+    end
+    stopAutoAim()
+    autoAimEnabled = true
+    local hum = Player.Character
+        and Player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        savedAutoRotate = hum.AutoRotate
+        hum.AutoRotate = false
+    end
+    aimConnection = RunService.RenderStepped:Connect(aimStep)
+    autoAimButton.Text = "自動瞄準 關閉"
+    autoAimButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
 end
 
 autoAimButton.MouseButton1Click:Connect(function()
-    -- 沒選目標就不能開啟
-    if not aimTarget then return end
-
-    autoAimEnabled = not autoAimEnabled
-
     if autoAimEnabled then
-        autoAimButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
-        autoAimButton.Text = "自動瞄準 關閉"
-
-        -- 監聽技能按鍵，按下瞬間轉向
-        aimConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if not autoAimEnabled then return end
-            -- 檢查是否是技能鍵
-            for _, key in ipairs(skillKeys) do
-                if input.KeyCode == key or input.UserInputType == key then
-                    faceTarget()
-                    break
-                end
-            end
-        end)
+        stopAutoAim()
+        game.StarterGui:SetCore("SendNotification",
+            { Title = "自動瞄準", Text = "已關閉", Duration = 2 })
     else
-        autoAimButton.BackgroundColor3 = Color3.fromRGB(180, 80, 200)
-        autoAimButton.Text = "自動瞄準 開啟"
-        if aimConnection then
-            aimConnection:Disconnect()
-            aimConnection = nil
-        end
+        startAutoAim()
     end
 end)
--- ========== 自動瞄準功能結束 ==========
+
+Players.PlayerRemoving:Connect(function(p)
+    if aimTarget == p then
+        aimTarget = nil
+        if autoAimEnabled then stopAutoAim() else resetAimButton() end
+        selectTargetButton.Text = "選擇目標玩家"
+        selectTargetButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+end)
 
 -- ========== 速度控制功能代碼開始 ==========
 local TweenService = game:GetService("TweenService")
