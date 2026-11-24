@@ -1242,6 +1242,7 @@ end)
 local TweenService = game:GetService("TweenService")
 local speedConnection = nil
 local currentSpeedValue = nil
+local lastSpeedTween = nil
 
 local function startSpeedLoop(val)
     if speedConnection then
@@ -1250,6 +1251,16 @@ local function startSpeedLoop(val)
     end
     currentSpeedValue = val
     speedConnection = RunService.Heartbeat:Connect(function()
+        -- 飛行中：速度掛暫停，並取消還沒跑完的瞬移，避免干擾飛行
+        -- 關閉飛行後 isFlying 變成 false，這裡會自動恢復速度
+        if isFlying then
+            if lastSpeedTween then
+                lastSpeedTween:Cancel()
+                lastSpeedTween = nil
+            end
+            return
+        end
+
         local char = Player.Character
         if not char then return end
         local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -1260,7 +1271,8 @@ local function startSpeedLoop(val)
             local distance = currentSpeedValue * 0.05
             local tweenInfo = TweenInfo.new(0.05, Enum.EasingStyle.Linear)
             local targetCFrame = CFrame.new(hrp.Position + moveDir * distance) * (hrp.CFrame - hrp.Position)
-            TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame}):Play()
+            lastSpeedTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+            lastSpeedTween:Play()
         end
     end)
 end
