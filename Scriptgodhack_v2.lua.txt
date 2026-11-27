@@ -302,7 +302,7 @@ local FastAttackSettings = {
     AutoClick = false,
     ClickDelay = 0,
     Team = "Marines",
-    Distance = 250，
+    Distance = 250,
     AutoV4 = false   --自動 V4
 }
 -- ========== 自動戰鬥系統設置結束 ==========
