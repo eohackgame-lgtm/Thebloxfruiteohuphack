@@ -302,7 +302,8 @@ local FastAttackSettings = {
     AutoClick = false,
     ClickDelay = 0,
     Team = "Marines",
-    Distance = 150
+    Distance = 250
+    AutoV4 = false   --自動 V4
 }
 -- ========== 自動戰鬥系統設置結束 ==========
 
@@ -428,6 +429,79 @@ local respawnMarineButton = makeBattleButton("重生成海軍", Color3.fromRGB(6
 
 -- 自動攻擊開關按鈕
 local toggleAutoBattleButton = makeBattleButton("關閉自動攻擊", Color3.fromRGB(200, 80, 80))
+
+-- ========== 自動 V4 功能 ==========
+local autoV4Button = makeBattleButton("自動開啟 V4：關閉", Color3.fromRGB(100, 100, 180))
+local autoV4Loop = nil
+
+local function getEnergyValue()
+    local success, energy = pcall(function()
+        return Player.Character.Energy.Value
+    end)
+    return success and energy or 0
+end
+
+local function getMaxEnergy()
+    local success, maxEnergy = pcall(function()
+        return Player.Character.Energy.MaxValue or 100
+    end)
+    return success and maxEnergy or 100
+end
+
+local function activateV4()
+    pcall(function()
+        ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateAbility", "Awakening")
+    end)
+end
+
+local function startAutoV4()
+    if autoV4Loop then return end
+    autoV4Loop = task.spawn(function()
+        while FastAttackSettings.AutoV4 do
+            task.wait(0.5)
+            if Player and Player.Character then
+                local currentEnergy = getEnergyValue()
+                local maxEnergy = getMaxEnergy()
+                if currentEnergy >= maxEnergy then
+                    activateV4()
+                end
+            end
+        end
+        autoV4Loop = nil
+    end)
+end
+
+local function stopAutoV4()
+    FastAttackSettings.AutoV4 = false
+    if autoV4Loop then
+        task.cancel(autoV4Loop)
+        autoV4Loop = nil
+    end
+end
+
+autoV4Button.MouseButton1Click:Connect(function()
+    FastAttackSettings.AutoV4 = not FastAttackSettings.AutoV4
+    if FastAttackSettings.AutoV4 then
+        autoV4Button.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+        autoV4Button.Text = "自動開啟 V4：開啟"
+        startAutoV4()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自動 V4",
+            Text = "已開啟！能量滿時自動激活",
+            Duration = 3
+        })
+    else
+        autoV4Button.BackgroundColor3 = Color3.fromRGB(100, 100, 180)
+        autoV4Button.Text = "自動開啟 V4：關閉"
+        stopAutoV4()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "自動 V4",
+            Text = "已關閉",
+            Duration = 3
+        })
+    end
+end)
+-- ========== 自動 V4 功能結束 ==========
 
 -- 分隔線標題
 local aimSectionLabel = Instance.new("TextLabel")
@@ -1127,7 +1201,7 @@ end)
 
 -- ========== 自動瞄準（只在放招瞬間轉向） ==========
 local UserInputService = game:GetService("UserInputService")
-local AIM_MAX_DIST = 800
+local AIM_MAX_DIST = 1000
 local AIM_HOLD     = 0.2   -- 放招後關 AutoRotate 的時間
 local AIM_KEYS = {
     Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C,
