@@ -434,37 +434,62 @@ local toggleAutoBattleButton = makeBattleButton("關閉自動攻擊", Color3.fro
 local autoV4Button = makeBattleButton("自動開啟 V4：關閉", Color3.fromRGB(100, 100, 180))
 local autoV4Loop = nil
 
-local function getEnergyValue()
-    local success, energy = pcall(function()
-        return Player.Character.Energy.Value
-    end)
-    return success and energy or 0
+-- 讀取 V4 狀態：回傳 (怒氣值, 是否已變身)，讀不到就回傳 nil
+local function getV4State()
+    local char = Player.Character
+    if not char then return nil, nil end
+    local energy = char:FindFirstChild("RaceEnergy")
+    local transformed = char:FindFirstChild("RaceTransformed")
+    if not energy or not transformed then return nil, nil end
+    return energy.Value, transformed.Value
 end
 
-local function getMaxEnergy()
-    local success, maxEnergy = pcall(function()
-        return Player.Character.Energy.MaxValue or 100
-    end)
-    return success and maxEnergy or 100
-end
-
-local function activateV4()
+-- 按一次 Y（跟英文腳本同一個按法，野獸/大佛狀態也是用這個）
+local function pressV4Key()
     pcall(function()
-        ReplicatedStorage.Remotes.CommF_:InvokeServer("ActivateAbility", "Awakening")
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Y, false, game)
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Y, false, game)
     end)
 end
 
 local function startAutoV4()
     if autoV4Loop then return end
     autoV4Loop = task.spawn(function()
+        local warned = false
         while FastAttackSettings.AutoV4 do
-            task.wait(0.5)
-            if Player and Player.Character then
-                local currentEnergy = getEnergyValue()
-                local maxEnergy = getMaxEnergy()
-                if currentEnergy >= maxEnergy then
-                    activateV4()
+            local energy, transformed = getV4State()
+
+            if energy == nil then
+                -- 讀不到怒氣數值（可能正在重生）。不要狂按，每 4 秒才試一次
+                if Player.Character and not warned then
+                    warned = true
+                    game.StarterGui:SetCore("SendNotification", {
+                        Title = "自動 V4",
+                        Text = "讀不到怒氣數值，改成每 4 秒按一次 Y",
+                        Duration = 4
+                    })
                 end
+                if Player.Character then pressV4Key() end
+                task.wait(4)
+            elseif transformed then
+                -- 已經變身中，什麼都不按，移動不會被影響
+                task.wait(0.5)
+            elseif energy >= 0.99 then
+                -- 怒氣滿了，只按這一次
+                pressV4Key()
+                -- 等最多 2 秒，確認變身成功再繼續，不重複亂按
+                local waited = 0
+                while waited < 2 and FastAttackSettings.AutoV4 do
+                    task.wait(0.25)
+                    waited = waited + 0.25
+                    local _, nowTransformed = getV4State()
+                    if nowTransformed then break end
+                end
+                task.wait(1)  -- 失敗時至少隔 1 秒才會再試，不會鎖住移動
+            else
+                -- 怒氣還沒滿，不按（就不會跳「怒值沒滿」）
+                task.wait(0.5)
             end
         end
         autoV4Loop = nil
@@ -1201,16 +1226,62 @@ end)
 
 -- ========== 自動瞄準（只在放招瞬間轉向） ==========
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local AIM_MAX_DIST = 1000
 local AIM_HOLD     = 0.2   -- 放招後關 AutoRotate 的時間
+local AIM_DEBUG    = false -- 手機瞄不準時改成 true：點技能按鈕會在輸出視窗印出被點到的介面路徑
 local AIM_KEYS = {
     Enum.KeyCode.Z, Enum.KeyCode.X, Enum.KeyCode.C,
     Enum.KeyCode.V, Enum.KeyCode.F,
 }
+local AIM_KEY_NAMES = { Z = true, X = true, C = true, V = true, F = true }
 
 local savedAutoRotate = nil
 local restoreToken    = 0
 local aimKeyConn      = nil
+local aimEndConn      = nil
+local aimTouchPending = {}  -- 記錄哪些觸控是點在技能按鈕上
+
+-- 判斷玩家平台：手機 / 電腦 / 兩者都有（觸控筆電、模擬器）
+local function getAimPlatform()
+    local touch = UserInputService.TouchEnabled
+    local keyboard = UserInputService.KeyboardEnabled
+    if touch and keyboard then return "hybrid" end
+    if touch then return "mobile" end
+    return "pc"
+end
+
+local AIM_PLATFORM_TEXT = { mobile = "手機", pc = "電腦", hybrid = "手機+電腦" }
+
+-- 手機：判斷這次觸控是不是點在技能按鈕（Z X C V F）上
+local function touchHitSkillButton(pos)
+    local pg = Player:FindFirstChildOfClass("PlayerGui")
+    if not pg then return false end
+
+    -- 不同裝置的螢幕座標可能差一個頂部欄高度，兩種座標都查
+    local inset = GuiService:GetGuiInset()
+    local hits = {}
+    for _, o in ipairs(pg:GetGuiObjectsAtPosition(pos.X, pos.Y)) do hits[#hits + 1] = o end
+    for _, o in ipairs(pg:GetGuiObjectsAtPosition(pos.X, pos.Y + inset.Y)) do hits[#hits + 1] = o end
+
+    for _, obj in ipairs(hits) do
+        local sg = obj:FindFirstAncestorOfClass("ScreenGui")
+        if sg and sg.Name == "Main" then  -- 只看遊戲本身的介面，不會誤判你的面板
+            local cur = obj
+            while cur and cur ~= pg do
+                local isKeyText = (cur:IsA("TextLabel") or cur:IsA("TextButton"))
+                    and AIM_KEY_NAMES[cur.Text] == true
+                if AIM_KEY_NAMES[cur.Name] or isKeyText then
+                    if AIM_DEBUG then print("[自動瞄準] 命中技能按鈕:", obj:GetFullName()) end
+                    return true
+                end
+                cur = cur.Parent
+            end
+            if AIM_DEBUG then print("[自動瞄準] 點到但不是技能按鈕:", obj:GetFullName()) end
+        end
+    end
+    return false
+end
 
 local function isTargetValid(p)
     if not p or p == Player or not p.Parent then return false end
@@ -1270,6 +1341,9 @@ end
 local function stopAutoAim()
     if aimKeyConn then aimKeyConn:Disconnect() end
     aimKeyConn = nil
+    if aimEndConn then aimEndConn:Disconnect() end
+    aimEndConn = nil
+    aimTouchPending = {}
     autoAimEnabled = false
     restoreToken = restoreToken + 1
     restoreAutoRotate(restoreToken)
@@ -1289,14 +1363,42 @@ local function startAutoAim()
     end
     stopAutoAim()
     autoAimEnabled = true
+
+    -- 依平台決定監聽方式：電腦聽鍵盤，手機聽觸控，兩者都有就都聽
+    local platform = getAimPlatform()
+    local useKeyboard = (platform == "pc" or platform == "hybrid")
+    local useTouch = (platform == "mobile" or platform == "hybrid")
+
     aimKeyConn = UserInputService.InputBegan:Connect(function(input)
-        if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-        for _, k in ipairs(AIM_KEYS) do
-            if input.KeyCode == k then castAim(); break end
+        if useKeyboard and input.UserInputType == Enum.UserInputType.Keyboard then
+            for _, k in ipairs(AIM_KEYS) do
+                if input.KeyCode == k then castAim(); break end
+            end
+        elseif useTouch and input.UserInputType == Enum.UserInputType.Touch then
+            if touchHitSkillButton(input.Position) then
+                aimTouchPending[input] = true
+                castAim()  -- 手指按下的瞬間先轉向
+            end
         end
     end)
+
+    if useTouch then
+        -- 手機的技能通常在手指放開時才發動，放開時再對準一次
+        aimEndConn = UserInputService.InputEnded:Connect(function(input)
+            if aimTouchPending[input] then
+                aimTouchPending[input] = nil
+                castAim()
+            end
+        end)
+    end
+
     autoAimButton.Text = "自動瞄準 關閉"
     autoAimButton.BackgroundColor3 = Color3.fromRGB(80, 200, 120)
+    game.StarterGui:SetCore("SendNotification", {
+        Title = "自動瞄準",
+        Text = "已開啟（偵測到：" .. AIM_PLATFORM_TEXT[platform] .. "）",
+        Duration = 3
+    })
 end
 
 autoAimButton.MouseButton1Click:Connect(function()
